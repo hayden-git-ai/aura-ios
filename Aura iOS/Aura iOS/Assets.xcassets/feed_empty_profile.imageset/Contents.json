@@ -1,0 +1,6 @@
+{
+  "images" : [
+    { "idiom" : "universal", "filename" : "feed_empty_profile.png" }
+  ],
+  "info" : { "author" : "xcode", "version" : 1 }
+}
