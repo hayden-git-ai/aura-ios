@@ -1,0 +1,8 @@
+{
+  "images" : [
+    { "idiom" : "universal", "scale" : "1x", "filename" : "app-icon-chatgpt.png" },
+    { "idiom" : "universal", "scale" : "2x", "filename" : "app-icon-chatgpt@2x.png" },
+    { "idiom" : "universal", "scale" : "3x", "filename" : "app-icon-chatgpt@3x.png" }
+  ],
+  "info" : { "author" : "xcode", "version" : 1 }
+}
