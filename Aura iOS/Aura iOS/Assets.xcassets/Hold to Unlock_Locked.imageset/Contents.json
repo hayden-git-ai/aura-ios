@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "Hold to Unlock_Locked.png",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}
