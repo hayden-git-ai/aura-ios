@@ -1,0 +1,71 @@
+{
+  "appPolicies" : {
+    "eula" : "",
+    "policies" : [ ]
+  },
+  "identifier" : "AURA_SK_CONFIG",
+  "nonRenewingSubscriptions" : [ ],
+  "products" : [ ],
+  "settings" : {
+    "_applicationInternalID" : "0",
+    "_developerTeamID" : "",
+    "_lastSynchronizedDate" : 0
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "21000001",
+      "localizations" : [ ],
+      "name" : "Aura Pro",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [ ],
+          "codeOffers" : [ ],
+          "displayPrice" : "69.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "21000010",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Aura Pro, billed yearly",
+              "displayName" : "Annual",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "aura_annual",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Annual",
+          "subscriptionGroupID" : "21000001",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [ ]
+        },
+        {
+          "adHocOffers" : [ ],
+          "codeOffers" : [ ],
+          "displayPrice" : "9.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "21000011",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Aura Pro, billed weekly",
+              "displayName" : "Weekly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "aura_weekly",
+          "recurringSubscriptionPeriod" : "P1W",
+          "referenceName" : "Weekly",
+          "subscriptionGroupID" : "21000001",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [ ]
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

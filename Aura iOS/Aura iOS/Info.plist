@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  Base Info.plist for the app target. GENERATE_INFOPLIST_FILE stays on and
+	  merges the INFOPLIST_KEY_* build settings on top of this, so this file only
+	  carries what those settings can't express: the URL scheme Google sign-in
+	  needs for its OAuth callback (the reversed iOS client id).
+	-->
+	<!--
+	  CFBundleName defaults to the target name ("Aura iOS"), and the system sign-in
+	  consent sheet (Google / ASWebAuthenticationSession) shows it. Pin it to "Aura"
+	  so that sheet reads "Aura", matching CFBundleDisplayName (the home-screen
+	  label, set to "Aura" in build settings).
+	-->
+	<key>CFBundleName</key>
+	<string>Aura</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.509845153438-568v0jseqals794sj4iu6nf20ri0ghst</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>
