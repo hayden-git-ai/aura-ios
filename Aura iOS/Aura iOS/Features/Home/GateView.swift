@@ -221,14 +221,14 @@ private struct StreakBadge: View {
                 Circle()
                     .fill(Color.white.opacity(0.14))
                     .frame(width: 44, height: 44)
-                Image("StreakFireIcon")
+                Image("StreakFlame")
                     .resizable()
                     .scaledToFit()
                     .frame(width: 28, height: 30)
             }
             // Plain white numeral, same display face as the screen-time readout.
             Text("\(count)")
-                .font(Typography.display(size: 22))
+                .font(Typography.body(size: 22))
                 .foregroundStyle(.white)
         }
     }

@@ -52,6 +52,175 @@ final class AccountIsolationTests: XCTestCase {
 
     private let watermarkDay = Date(timeIntervalSince1970: 1_700_000_000)
 
+    func testPendingPurchaseSurvivesRelaunchAndActivatesOnlyOnce() {
+        let fixture = Fixture(); defer { fixture.clean() }
+        let store = fixture.store()
+        store.grantScreenTime(minutes: 30)
+        XCTAssertFalse(store.beginPendingScreenTimePurchase(minutes: 31))
+        XCTAssertTrue(store.beginPendingScreenTimePurchase(minutes: 10))
+        let purchase = try! XCTUnwrap(store.pendingScreenTimePurchase)
+        XCTAssertEqual(store.coinBalance, 20)
+        XCTAssertFalse(store.isUnlocked)
+        XCTAssertFalse(store.beginPendingScreenTimePurchase(minutes: 5))
+
+        let restored = fixture.store()
+        XCTAssertEqual(restored.pendingScreenTimePurchase?.id, purchase.id)
+        XCTAssertEqual(restored.coinBalance, 20)
+        XCTAssertTrue(restored.activatePendingScreenTimePurchase(id: purchase.id))
+        let deadline = restored.unlockEndsAt
+        XCTAssertNil(restored.pendingScreenTimePurchase)
+        XCTAssertFalse(restored.activatePendingScreenTimePurchase(id: purchase.id))
+        XCTAssertEqual(restored.unlockEndsAt, deadline)
+
+        let restarted = fixture.store()
+        XCTAssertNil(restarted.pendingScreenTimePurchase)
+        // Account snapshots use ISO8601 dates with whole-second precision.
+        let restoredDeadline = try! XCTUnwrap(restarted.unlockEndsAt)
+        let activatedDeadline = try! XCTUnwrap(deadline)
+        XCTAssertLessThan(abs(restoredDeadline.timeIntervalSince(activatedDeadline)), 1)
+        XCTAssertFalse(restarted.activatePendingScreenTimePurchase(id: purchase.id))
+    }
+
+    func testPendingPurchaseAddsToExistingTimeAfterHandoff() {
+        let fixture = Fixture(); defer { fixture.clean() }
+        let store = fixture.store()
+        store.grantScreenTime(minutes: 30)
+        store.startPurchasedScreenTime(minutes: 5)
+        let oldDeadline = try! XCTUnwrap(store.unlockEndsAt)
+        XCTAssertTrue(store.beginPendingScreenTimePurchase(minutes: 10))
+        XCTAssertEqual(store.unlockEndsAt, oldDeadline)
+        XCTAssertTrue(store.activatePendingScreenTimePurchase(id: store.pendingScreenTimePurchase!.id))
+        XCTAssertEqual(store.unlockEndsAt, oldDeadline.addingTimeInterval(600))
+        XCTAssertEqual(store.coinBalance, 20)
+    }
+
+    func testPreviewClockRestartsAfterIdleWhenTimeIsPurchased() async throws {
+        let fixture = Fixture(); defer { fixture.clean() }
+        let store = fixture.store()
+        store.startPreviewClock()
+        try await Task.sleep(for: .milliseconds(1200))
+        store.grantScreenTime(minutes: 5)
+        XCTAssertTrue(store.beginPendingScreenTimePurchase(minutes: 5))
+        XCTAssertTrue(store.activatePendingScreenTimePurchase(id: store.pendingScreenTimePurchase!.id))
+        let clockAtActivation = store.now
+        try await Task.sleep(for: .milliseconds(1200))
+        XCTAssertGreaterThan(store.now, clockAtActivation)
+        XCTAssertLessThan(store.secondsRemaining, 300)
+        store.debugClearScreenTime()
+        XCTAssertFalse(store.isUnlocked)
+        XCTAssertNil(store.gateCountdown)
+    }
+
+    func testFourPendingPurchasesPreserveEveryPurchasedMinute() {
+        let fixture = Fixture(); defer { fixture.clean() }
+        let store = fixture.store()
+        store.grantScreenTime(minutes: 30)
+        var firstDeadline: Date?
+        for index in 0..<4 {
+            XCTAssertTrue(store.beginPendingScreenTimePurchase(minutes: 5))
+            let purchase = try! XCTUnwrap(store.pendingScreenTimePurchase)
+            XCTAssertTrue(store.activatePendingScreenTimePurchase(id: purchase.id))
+            let deadline = try! XCTUnwrap(store.unlockEndsAt)
+            if index == 0 { firstDeadline = deadline }
+            XCTAssertEqual(deadline, firstDeadline!.addingTimeInterval(Double(index * 300)))
+            XCTAssertFalse(store.activatePendingScreenTimePurchase(id: purchase.id))
+        }
+        XCTAssertEqual(store.coinBalance, 10)
+        XCTAssertEqual(store.purchases.count, 4)
+        let restored = fixture.store()
+        XCTAssertNil(restored.pendingScreenTimePurchase)
+        XCTAssertLessThan(abs(restored.unlockEndsAt!.timeIntervalSince(firstDeadline!.addingTimeInterval(900))), 1)
+    }
+
+    func testPendingPurchaseWriteFailureDoesNotChargeOrLoseActivation() {
+        let fixture = Fixture(); defer { fixture.clean() }
+        let store = fixture.store()
+        store.grantScreenTime(minutes: 20)
+        fixture.failedOperations = [.writeSnapshot]
+        XCTAssertFalse(store.beginPendingScreenTimePurchase(minutes: 10))
+        XCTAssertEqual(store.coinBalance, 20)
+        XCTAssertNil(store.pendingScreenTimePurchase)
+        fixture.failedOperations = []
+        XCTAssertTrue(store.beginPendingScreenTimePurchase(minutes: 10))
+        let id = store.pendingScreenTimePurchase!.id
+        fixture.failedOperations = [.writeSnapshot]
+        XCTAssertFalse(store.activatePendingScreenTimePurchase(id: id))
+        XCTAssertFalse(store.isUnlocked)
+        XCTAssertEqual(store.pendingScreenTimePurchase?.id, id)
+        fixture.failedOperations = []
+        XCTAssertTrue(store.activatePendingScreenTimePurchase(id: id))
+    }
+
+    func testEarningAndPowerUpsNeverStartScreenTime() {
+        let fixture = Fixture(); defer { fixture.clean() }
+        let store = fixture.store()
+        store.grantScreenTime(minutes: 25)
+        XCTAssertEqual(store.coinBalance, 25)
+        XCTAssertEqual(store.todayEarnedCoins, 25)
+        XCTAssertFalse(store.isUnlocked)
+        XCTAssertNil(store.gateCountdown)
+        XCTAssertEqual(store.claimReachedPowerUps(), 5)
+        XCTAssertEqual(store.coinBalance, 30)
+        XCTAssertFalse(store.isUnlocked)
+        XCTAssertNil(store.claimReachedPowerUps())
+    }
+
+    func testSpendingDoesNotReduceDailyProgressOrLosePowerUpEligibility() {
+        let fixture = Fixture(); defer { fixture.clean() }
+        let store = fixture.store()
+        store.grantScreenTime(minutes: 50)
+        let progress = store.dailyGoalProgress
+        XCTAssertTrue(store.chargeForScreenTime(minutes: 40))
+        XCTAssertEqual(store.coinBalance, 10)
+        XCTAssertEqual(store.todayEarnedCoins, 50)
+        XCTAssertEqual(store.dailyGoalProgress, progress)
+        XCTAssertFalse(store.isUnlocked)
+        XCTAssertEqual(store.claimReachedPowerUps(), 10)
+        XCTAssertEqual(store.claimedPowerUps, [25, 50])
+        XCTAssertFalse(store.chargeForScreenTime(minutes: 21))
+        store.startPurchasedScreenTime(minutes: 40)
+        XCTAssertTrue(store.isUnlocked)
+        XCTAssertEqual(store.coinBalance, 20)
+        store.grantScreenTime(minutes: 5)
+        XCTAssertLessThanOrEqual(store.secondsRemaining, 2400)
+    }
+
+    func testHabitAndFocusSessionsCannotReplaceOrOverlap() {
+        let fixture = Fixture(); defer { fixture.clean() }
+        let store = fixture.store()
+        XCTAssertTrue(store.startHabitSession(habitName: "Read", rewardMinutes: 15, sessionMinutes: 15))
+        let end = store.activeHabitSession?.endsAt
+        XCTAssertFalse(store.startHabitSession(habitName: "Music", rewardMinutes: 30, sessionMinutes: 30))
+        XCTAssertFalse(store.startFocusSession(lengthMinutes: 15, isUntimed: false, earnRate: 60))
+        XCTAssertEqual(store.activeHabitSession?.habitName, "Read")
+        XCTAssertEqual(store.activeHabitSession?.endsAt, end)
+        store.toggleHabitSessionPause()
+        XCTAssertFalse(store.startFocusSession(lengthMinutes: 15, isUntimed: false, earnRate: 60))
+        store.endHabitSession()
+        XCTAssertTrue(store.startFocusSession(lengthMinutes: 15, isUntimed: false, earnRate: 60))
+        XCTAssertFalse(store.startHabitSession(habitName: "Music", rewardMinutes: 30, sessionMinutes: 30))
+        XCTAssertEqual(store.finishFocusSession(banking: false), 0)
+        XCTAssertEqual(store.finishFocusSession(banking: true), 0)
+        XCTAssertEqual(store.coinBalance, 0)
+    }
+
+    func testCompletedHabitPaysOnceWithoutUnlockingAfterRelaunch() {
+        let fixture = Fixture(); defer { fixture.clean() }
+        let store = fixture.store()
+        XCTAssertTrue(store.startHabitSession(habitName: "Read", rewardMinutes: 15, sessionMinutes: 15))
+        store.activeHabitSession?.endsAt = Date().addingTimeInterval(-1)
+        store.refreshClock()
+        store.refreshClock()
+        XCTAssertNil(store.activeHabitSession)
+        XCTAssertEqual(store.coinBalance, 15)
+        XCTAssertFalse(store.isUnlocked)
+        let relaunched = fixture.store()
+        relaunched.refreshClock()
+        XCTAssertNil(relaunched.activeHabitSession)
+        XCTAssertEqual(relaunched.coinBalance, 15)
+        XCTAssertFalse(relaunched.isUnlocked)
+    }
+
     private func persist(_ store: HabitStore, purchaseMinutes: Int, watermark: Double) {
         store.purchases = [.init(minutes: purchaseMinutes, date: watermarkDay)]
         store.setAccountHealthWatermarkForTesting(["steps": watermark], day: watermarkDay)

@@ -12,16 +12,10 @@ struct ProfileAvatarCircle: View {
     @Environment(HabitStore.self) private var store
     var size: CGFloat = 92
 
-    /// Up to two initials from the display name (first + last). Falls back to a
-    /// single glyph so it's never empty.
-    private var initials: String {
-        let letters = store.displayName
-            .split(separator: " ")
-            .prefix(2)
-            .compactMap(\.first)
-        let joined = String(letters).uppercased()
-        return joined.isEmpty ? "?" : joined
-    }
+    /// Up to two initials from the display name (first + last). A single-name
+    /// identity uses its first two graphemes; setup validation normally ensures
+    /// this fallback is only reached for legacy, incomplete profiles.
+    private var initials: String { ProfileIdentity.initials(for: store.displayName) }
 
     var body: some View {
         Group {

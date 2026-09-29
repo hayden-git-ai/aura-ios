@@ -48,6 +48,7 @@ final class PoseCameraController: NSObject, ObservableObject {
     private let poseRequest = VNDetectHumanBodyPoseRequest()
     private let engine: RepEngine
     private var isConfigured = false
+    private var portraitBufferSize: CGSize = .zero
     /// Main-thread ownership generation. A delayed permission result may start
     /// only the same appearance that requested it; `stop()` invalidates it.
     private var lifecycleGeneration: UInt64 = 0
@@ -103,7 +104,9 @@ final class PoseCameraController: NSObject, ObservableObject {
     /// camera mirroring. The overlay fills the same frame as the preview, so
     /// these read directly as view coordinates.
     func viewPoint(for visionPoint: CGPoint) -> CGPoint {
-        previewLayer.layerPointConverted(fromCaptureDevicePoint: CGPoint(x: visionPoint.x, y: 1 - visionPoint.y))
+        PoseCoordinateTransform.previewPoint(fromVisionPoint: visionPoint,
+            bufferSize: portraitBufferSize, previewSize: previewLayer.bounds.size,
+            mirrored: true)
     }
 
     @MainActor
@@ -129,6 +132,19 @@ final class PoseCameraController: NSObject, ObservableObject {
                 if self.session.canAddOutput(self.videoOutput) {
                     self.session.addOutput(self.videoOutput)
                 }
+                // Deliver an upright, unmirrored portrait buffer to Vision.
+                // Mirror only the preview so the skeleton follows the visible
+                // front-camera image without mirroring the buffer twice.
+                if let connection = self.videoOutput.connection(with: .video) {
+                    connection.videoOrientation = .portrait
+                    connection.automaticallyAdjustsVideoMirroring = false
+                    connection.isVideoMirrored = false
+                }
+                if let connection = self.previewLayer.connection {
+                    connection.videoOrientation = .portrait
+                    connection.automaticallyAdjustsVideoMirroring = false
+                    connection.isVideoMirrored = true
+                }
                 self.session.commitConfiguration()
                 self.isConfigured = true
             }
@@ -143,10 +159,11 @@ extension PoseCameraController: AVCaptureVideoDataOutputSampleBufferDelegate {
         didOutput sampleBuffer: CMSampleBuffer,
         from connection: AVCaptureConnection
     ) {
-        // Front camera in portrait: the raw buffer is landscape; `.leftMirrored`
-        // gives Vision an upright, mirrored image matching the preview. (One of
-        // the values likely to need on-device confirmation.)
-        let handler = VNImageRequestHandler(cmSampleBuffer: sampleBuffer, orientation: .leftMirrored, options: [:])
+        // The output connection requests portrait buffers and leaves them
+        // unmirrored, so Vision's native `.up` orientation matches the source.
+        guard let buffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+        let bufferSize = CGSize(width: CVPixelBufferGetWidth(buffer), height: CVPixelBufferGetHeight(buffer))
+        let handler = VNImageRequestHandler(cmSampleBuffer: sampleBuffer, orientation: .up, options: [:])
         try? handler.perform([poseRequest])
 
         // No early return on a missing observation any more: "no body at all"
@@ -156,7 +173,7 @@ extension PoseCameraController: AVCaptureVideoDataOutputSampleBufferDelegate {
         if let observation = poseRequest.results?.first,
            let recognized = try? observation.recognizedPoints(.all) {
             var points: [VNHumanBodyPoseObservation.JointName: CGPoint] = [:]
-            for (name, point) in recognized where point.confidence > 0.3 {
+            for (name, point) in recognized where point.confidence >= 0.5 {
                 points[name] = point.location
             }
             bodyPose = BodyPose(points: points)
@@ -181,6 +198,7 @@ extension PoseCameraController: AVCaptureVideoDataOutputSampleBufferDelegate {
         let reps = engine.reps
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
+            self.portraitBufferSize = bufferSize
             // Pose updates every frame (isolated to the overlay's own object).
             self.poseLayer.pose = bodyPose
             // Reps and framing change rarely — only publish on an actual change
@@ -190,6 +208,20 @@ extension PoseCameraController: AVCaptureVideoDataOutputSampleBufferDelegate {
                 withAnimation(.snappy(duration: 0.25)) { self.framing = raw }
             }
         }
+    }
+}
+
+/// Vision sees an upright, unmirrored portrait buffer. Apply the same centered
+/// aspect-fill crop as the preview, then its front-camera mirror exactly once.
+enum PoseCoordinateTransform {
+    static func previewPoint(fromVisionPoint point: CGPoint, bufferSize: CGSize,
+                             previewSize: CGSize, mirrored: Bool) -> CGPoint {
+        guard bufferSize.width > 0, bufferSize.height > 0 else { return .zero }
+        let scale = max(previewSize.width / bufferSize.width, previewSize.height / bufferSize.height)
+        let width = bufferSize.width * scale
+        let height = bufferSize.height * scale
+        return CGPoint(x: (mirrored ? 1 - point.x : point.x) * width + (previewSize.width - width) / 2,
+                       y: (1 - point.y) * height + (previewSize.height - height) / 2)
     }
 }
 

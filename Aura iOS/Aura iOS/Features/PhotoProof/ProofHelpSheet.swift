@@ -60,25 +60,20 @@ struct ProofHelpSheet: View {
         }
     }
 
-    /// `LightSubSheetHeader` composed by hand, because the art has to sit
-    /// between the drag capsule and the title and the shared header has no
-    /// slot for it. Type and spacing are copied from it exactly so this reads
-    /// as the same header.
+    /// `LightSubSheetHeader` composed by hand so this reads as the same header
+    /// as the other help sheets.
     private var header: some View {
         VStack(spacing: 0) {
             LightDragCapsule()
 
-            artPlaceholder
-                .padding(.top, Theme.Spacing.l)
-
-            Text("How this works")
+            Text("How Healthy Habits Work")
                 .auraFont(.display, SheetType.title, .bold)
                 .foregroundStyle(LightSheet.title)
                 .frame(maxWidth: .infinity)
                 .padding(.horizontal, Theme.Spacing.xl)
-                .padding(.top, Theme.Spacing.xl)
+                .padding(.top, Theme.Spacing.l)
 
-            Text("Take a pic, Aura will verify you started.")
+            Text("Show Aura you started, then earn coins.")
                 .auraFont(.body, SheetType.subtitle, .regular)
                 .foregroundStyle(SheetType.subtitleColor)
                 .multilineTextAlignment(.center)
@@ -86,15 +81,6 @@ struct ProofHelpSheet: View {
                 .padding(.horizontal, Theme.Spacing.xxl)
                 .padding(.top, Theme.Spacing.xs)
         }
-    }
-
-    private var artPlaceholder: some View {
-        Image("FoxHowItWorks")
-            .resizable()
-            .interpolation(.high)
-            .scaledToFit()
-            .frame(height: 140)
-            .foxShadow()
     }
 
     /// Identical construction to `StepsExplainerSheet.row`, so a step reads the

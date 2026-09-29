@@ -164,6 +164,7 @@ final class SupabaseManager {
     // MARK: - Support chat
 
     private struct SupportSendBody: Encodable {
+        let client_message_id: UUID
         let text: String
         let media_url: String?
         let media_mime: String?
@@ -179,7 +180,7 @@ final class SupabaseManager {
     /// state and offer a retry (matching iMessage) instead of silently dropping it.
     @discardableResult
     func sendSupportMessage(
-        _ text: String, mediaURL: String? = nil, mediaMime: String? = nil, mediaName: String? = nil,
+        _ text: String, messageID: UUID, mediaURL: String? = nil, mediaMime: String? = nil, mediaName: String? = nil,
         expectedUserID: UUID,
     ) async -> Bool {
         guard let supportClient = await supportClient(for: expectedUserID) else { return false }
@@ -187,7 +188,9 @@ final class SupabaseManager {
             _ = try await supportClient.functions.invoke(
                 "support-send",
                 options: FunctionInvokeOptions(
-                    body: SupportSendBody(text: text, media_url: mediaURL, media_mime: mediaMime, media_name: mediaName)
+                    body: SupportSendBody(client_message_id: messageID, text: text,
+                                          media_url: mediaURL, media_mime: mediaMime,
+                                          media_name: mediaName)
                 )
             )
             return true
@@ -207,13 +210,26 @@ final class SupabaseManager {
         expectedUserID: UUID
     ) async -> String? {
         guard let supportClient = await supportClient(for: expectedUserID) else { return nil }
+        // Keep the client-side contract aligned with the private bucket and the
+        // support-send function. UI importers are advisory; this guard also
+        // covers camera/photo and retry paths.
+        guard data.count <= 10 * 1024 * 1024 else { return nil }
+        // AVAudioRecorder and some document providers report m4a using either
+        // audio/m4a or audio/x-m4a. Storage uses the canonical MP4 audio type.
+        let normalizedContentType = ["audio/m4a", "audio/x-m4a"].contains(contentType)
+            ? "audio/mp4" : contentType
+        let supportedMIME = normalizedContentType.hasPrefix("image/")
+            || ["application/pdf", "text/plain",
+                "audio/mp4", "audio/aac",
+                "audio/mpeg", "audio/wav", "audio/x-wav"].contains(normalizedContentType)
+        guard supportedMIME else { return nil }
         // Images are sanitized (capped, EXIF stripped, re-encoded) before storage;
-        // support images are already JPEG so the content type is unchanged. Non-image
+        // HEIF/PNG and other supported images are normalized to JPEG. Non-image
         // attachments pass through (the bucket's MIME + size limits are the guard).
         var data = data
         var uploadExtension = ext
-        var uploadContentType = contentType
-        if contentType.hasPrefix("image/") {
+        var uploadContentType = normalizedContentType
+        if normalizedContentType.hasPrefix("image/") {
             guard let clean = ImageSanitizer.sanitizedJPEG(from: data) else { return nil }
             data = clean
             uploadExtension = "jpg"

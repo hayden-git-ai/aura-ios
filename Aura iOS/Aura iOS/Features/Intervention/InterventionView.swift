@@ -265,7 +265,7 @@ struct InterventionView: View {
                             Text("\(minutes) min")
                                 // Smaller than the fox's line above (20pt), so the
                                 // question stays the loudest thing on the screen.
-                                .auraFont(.display, 18, .bold)
+                                .auraFont(.body, 18, .bold)
                                 .foregroundStyle(.white)
                                 .tag(minutes)
                         }

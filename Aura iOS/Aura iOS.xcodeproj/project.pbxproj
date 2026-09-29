@@ -139,6 +139,7 @@
 				DesignSystem/Components/CircleIconButton.swift,
 				DesignSystem/Components/LightSheet.swift,
 				DesignSystem/Components/PressBounceStyle.swift,
+				DesignSystem/Components/StrokedNumber.swift,
 				DesignSystem/Components/TrendBadge.swift,
 				DesignSystem/FontRegistration.swift,
 				DesignSystem/Haptics.swift,
@@ -778,7 +779,7 @@
 				INFOPLIST_KEY_NSCameraUsageDescription = "Aura shows a live view of you when you're about to unblock an app, so you can see yourself make the call.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Aura reads today's steps, workouts and mindful minutes so your real-world activity can earn screen time.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Aura does not write to Apple Health. When you connect Health, Aura only reads activity to award screen-time progress.";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Aura uses the mic when you record a video or dictate a message in the support chat.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Aura uses the microphone to record voice notes you choose to send in support chat.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Aura lets you pick a profile photo from your library.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Aura turns your speech into text when you dictate a message in the support chat.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
@@ -813,7 +814,7 @@
 				CODE_SIGN_ENTITLEMENTS = "Aura iOS/Aura iOS.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = ARJKQYBWDW;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -822,7 +823,7 @@
 				INFOPLIST_KEY_NSCameraUsageDescription = "Aura shows a live view of you when you're about to unblock an app, so you can see yourself make the call.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Aura reads today's steps, workouts and mindful minutes so your real-world activity can earn screen time.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Aura does not write to Apple Health. When you connect Health, Aura only reads activity to award screen-time progress.";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Aura uses the mic when you record a video or dictate a message in the support chat.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Aura uses the microphone to record voice notes you choose to send in support chat.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Aura lets you pick a profile photo from your library.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Aura turns your speech into text when you dictate a message in the support chat.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
@@ -967,7 +968,7 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_IDENTITY = "Apple Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = ARJKQYBWDW;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = AuraTimerWidget/Info.plist;
@@ -1026,7 +1027,7 @@
 				CODE_SIGN_ENTITLEMENTS = AuraShieldMonitor/AuraShieldMonitor.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = ARJKQYBWDW;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = AuraShieldMonitor/Info.plist;
@@ -1083,7 +1084,7 @@
 				CODE_SIGN_ENTITLEMENTS = AuraStatsReport/AuraStatsReport.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = ARJKQYBWDW;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = AuraStatsReport/Info.plist;

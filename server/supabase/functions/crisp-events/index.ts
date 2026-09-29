@@ -16,6 +16,8 @@
  * on, so relaying never echoes back.
  */
 
+import { checkedFetch } from "../_shared/checked-fetch.ts";
+
 Deno.serve(async (request: Request): Promise<Response> => {
   if (request.method !== "POST") return new Response("POST only", { status: 405 });
 
@@ -32,11 +34,16 @@ Deno.serve(async (request: Request): Promise<Response> => {
     return new Response("bad json", { status: 400 });
   }
 
-  // Return 200 fast so Crisp does not retry; the work is one quick insert.
   // `message:send` is the visitor's own message (skipped); the founder's reply
   // arrives as `message:received`. We take either and act only on from:"operator".
   if (payload?.event === "message:send" || payload?.event === "message:received") {
-    await handleMessage(payload.data).catch(() => {});
+    try {
+      await handleMessage(payload.data);
+    } catch {
+      // A non-success response tells Crisp to retry instead of losing a founder
+      // reply during a temporary database or configuration failure.
+      return new Response("temporary failure", { status: 503 });
+    }
   }
   return new Response("ok", { status: 200 });
 });
@@ -58,13 +65,13 @@ async function handleMessage(d: any): Promise<void> {
     mediaName = typeof d.content.name === "string" ? d.content.name : "";
     mediaMime = (typeof d.content.type === "string" && d.content.type)
       ? d.content.type
-      : mimeForType(d.type);
+      : mimeForURL(mediaUrl, mimeForType(d.type));
   }
   if (!text && !mediaUrl) return;
 
   const url = Deno.env.get("SUPABASE_URL");
   const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!url || !key) return;
+  if (!url || !key) throw new Error("server misconfigured");
 
   // Which user owns this Crisp conversation?
   const row = await restSelectOne(
@@ -91,6 +98,22 @@ function mimeForType(t: string): string {
     case "audio": return "audio/mpeg";
     case "video": return "video/mp4";
     default: return "application/octet-stream";
+  }
+}
+
+/** Infer only known audio types from the URL when Crisp omits content.type. */
+function mimeForURL(rawURL: string, fallback: string): string {
+  try {
+    const extension = new URL(rawURL).pathname.split(".").pop()?.toLowerCase();
+    switch (extension) {
+      case "m4a": return "audio/mp4";
+      case "aac": return "audio/aac";
+      case "mp3": return "audio/mpeg";
+      case "wav": return "audio/wav";
+      default: return fallback;
+    }
+  } catch {
+    return fallback;
   }
 }
 
@@ -124,7 +147,7 @@ function timingSafeEqual(a: string, b: string): boolean {
 async function restInsert(
   url: string, key: string, table: string, row: Record<string, unknown>,
 ): Promise<void> {
-  await fetch(`${url}/rest/v1/${table}`, {
+  await checkedFetch("support reply insert", `${url}/rest/v1/${table}`, {
     method: "POST",
     headers: {
       apikey: key,
@@ -140,7 +163,7 @@ async function restInsert(
 async function restSelectOne(
   url: string, key: string, query: string,
 ): Promise<Record<string, unknown> | null> {
-  const r = await fetch(`${url}/rest/v1/${query}`, {
+  const r = await checkedFetch("support session select", `${url}/rest/v1/${query}`, {
     headers: {
       apikey: key,
       authorization: `Bearer ${key}`,
@@ -148,7 +171,6 @@ async function restSelectOne(
     },
     signal: AbortSignal.timeout(5_000),
   });
-  if (!r.ok) return null;
   const rows = await r.json();
   return Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
 }

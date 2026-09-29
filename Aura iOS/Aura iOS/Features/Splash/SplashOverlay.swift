@@ -210,8 +210,10 @@ final class SplashPlayerView: UIView {
         // Solid oval shadow under the fox's feet.
         let feetY = originY + foxFeetYInCanvas * canvasHeight
         let foxCenterXScreen = originX + foxCenterXInCanvas * canvasWidth
-        let shadowW = bodyWidth * 0.98
-        let shadowH = shadowW * 0.26
+        // Match Home's shadow in its 260pt rendering frame; bodyWidth measures
+        // only the visible fox and would make the contact shadow too small.
+        let shadowW: CGFloat = 260 * 0.51
+        let shadowH: CGFloat = 260 * 0.136
         groundShadow.frame = bounds
         // Nudged up 2px — it read a touch low under his body.
         groundShadow.path = UIBezierPath(ovalIn: CGRect(x: foxCenterXScreen - shadowW / 2,

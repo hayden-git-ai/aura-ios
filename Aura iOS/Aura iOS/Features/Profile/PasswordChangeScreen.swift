@@ -108,7 +108,7 @@ struct PasswordChangeScreen: View {
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(PressBounceStyle())
+                .buttonStyle(PressBounceStyle(hapticsEnabled: false))
             }
             .padding(.leading, Theme.Spacing.l)
             // The eye button carries its own 44pt hit area, so no trailing text pad.

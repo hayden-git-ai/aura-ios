@@ -88,8 +88,10 @@ struct BlockedNowSheet: View {
     /// is read-only.
     private func tile(_ icon: AppIconSource) -> some View {
         VStack(spacing: Theme.Spacing.s) {
-            FrozenAppTile(icon: icon, side: 48)
+            FrozenAppTile(icon: icon, side: 56)
             appName(icon)
+                .frame(maxWidth: .infinity)
+                .multilineTextAlignment(.center)
                 .auraFont(.body, 13, .semibold)
                 .foregroundStyle(SheetType.titleColor)
                 .lineLimit(1)

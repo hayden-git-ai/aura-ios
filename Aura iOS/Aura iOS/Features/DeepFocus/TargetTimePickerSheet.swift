@@ -59,7 +59,7 @@ struct TargetTimePickerSheet: View {
         HStack(spacing: 0) {
             Picker("", selection: $hours) {
                 ForEach(Self.hourOptions, id: \.self) { h in
-                    Text("\(h)").auraFont(.display, 20, .bold).foregroundStyle(LightSheet.title).tag(h)
+                    Text("\(h)").auraFont(.body, 20, .bold).foregroundStyle(LightSheet.title).tag(h)
                 }
             }
             .pickerStyle(.wheel)
@@ -72,7 +72,7 @@ struct TargetTimePickerSheet: View {
 
             Picker("", selection: $minutes) {
                 ForEach(Self.minuteOptions, id: \.self) { m in
-                    Text("\(m)").auraFont(.display, 20, .bold).foregroundStyle(LightSheet.title).tag(m)
+                    Text("\(m)").auraFont(.body, 20, .bold).foregroundStyle(LightSheet.title).tag(m)
                 }
             }
             .pickerStyle(.wheel)

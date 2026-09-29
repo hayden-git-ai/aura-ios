@@ -54,10 +54,10 @@ enum HabitCategory: String, CaseIterable, Codable, Identifiable {
     /// wayfinding — you always know which world you're in.
     var accent: Color {
         switch self {
-        case .photoTask: return Color(hex: "2586FF")   // the app's primary
-        case .exercise: return LightSheet.orange       // effort — the app's orange
+        case .photoTask: return LightSheet.healthyHabitsMint
+        case .exercise: return LightSheet.blue
         case .focus: return Color(hex: "5B4BE0")       // heads-down
-        case .healthSync: return Color(hex: "FF3B5C")  // Health's own pink-red
+        case .healthSync: return LightSheet.passiveIncomeGold
         }
     }
 
@@ -65,20 +65,20 @@ enum HabitCategory: String, CaseIterable, Codable, Identifiable {
     /// app's off-white, so a card reads as one object rather than a grey lid.
     var accentSoft: Color {
         switch self {
-        case .photoTask: return Color(hex: "E9F1FF")
-        case .exercise: return Color(hex: "FFF1E4")
+        case .photoTask: return LightSheet.healthyHabitsMintWash
+        case .exercise: return LightSheet.blueWash
         case .focus: return Color(hex: "EFEDFF")
-        case .healthSync: return Color(hex: "FFECEF")
+        case .healthSync: return LightSheet.passiveIncomeGoldWash
         }
     }
 
     /// The darker edge under a filled control in this colour.
     var accentShade: Color {
         switch self {
-        case .photoTask: return Color(hex: "1C69D6")
-        case .exercise: return Color(hex: "D15702")
+        case .photoTask: return LightSheet.healthyHabitsMintHeaderTop
+        case .exercise: return LightSheet.blueShade
         case .focus: return Color(hex: "4436B8")
-        case .healthSync: return Color(hex: "D62744")
+        case .healthSync: return LightSheet.passiveIncomeGoldShade
         }
     }
 

@@ -75,7 +75,7 @@ let ciContext = CIContext(options: [
 //    own drop shadow, which the distance key leaves behind as a grey halo. The
 //    fox (white / grey / black / red) is never green-dominant, so it's kept.
 let kernelSource = """
-kernel vec4 chromaKey(__sample s, vec3 keyColor, float inner, float outer, float despill, float spillLo, float spillHi, float keyIsBlue) {
+kernel vec4 chromaKey(__sample s, vec3 keyColor, float inner, float outer, float despill, float spillLo, float spillHi, float keyIsBlue, float darkProtect) {
     vec3 c = s.rgb;
     float aDist = smoothstep(inner, outer, distance(c, keyColor));
     // Spill = how far the KEY channel (green, or BLUE when keyIsBlue) rises above the
@@ -89,12 +89,24 @@ kernel vec4 chromaKey(__sample s, vec3 keyColor, float inner, float outer, float
     // so `b - g` catches the blue/purple spill on its glow while sparing the flame
     // itself; the white fox has r=g=b so it is never touched.
     float keyCh = mix(c.g, c.b, keyIsBlue);
-    float refCh = mix(c.r, c.g, keyIsBlue);
+    // Blue-screen spill is measured against the brighter warm channel. Using
+    // green alone treats blue-tinted black facial features as screen spill.
+    float blueReference = mix(c.g, max(c.r, c.g), step(0.0, darkProtect));
+    float refCh = mix(c.r, blueReference, keyIsBlue);
     float aSpill = 1.0 - smoothstep(spillLo, spillHi, keyCh - refCh);
+    // Earn's dark facial features can carry blue spill-like tint. An opt-in
+    // brightness threshold protects those interiors while leaving the default keyer
+    // unchanged for every existing animation.
+    // Keep low-luma facial details, but do not preserve a blue/purple screen
+    // contour merely because it is dark. Earn's face tint is below this excess;
+    // the saturated edge halo is above it and must remain keyable.
+    float blueExcess = c.b - max(c.r, c.g);
+    float dark = step(max(c.r, max(c.g, c.b)), darkProtect) * (1.0 - step(0.10, blueExcess));
+    aSpill = mix(aSpill, 1.0, dark);
     float a = min(aDist, aSpill);
     // Despill: clamp the key channel down to that neighbour, so any surviving spill
     // goes neutral/warm, not tinted. White fox (r=g=b) is unchanged.
-    float clamped = min(keyCh, refCh);
+    float clamped = mix(min(keyCh, refCh), keyCh, dark);
     c.g = mix(clamped, c.g, keyIsBlue);   // green mode -> g:=clamped ; blue -> keep g
     c.b = mix(c.b, clamped, keyIsBlue);   // green mode -> keep b   ; blue -> b:=clamped
     return vec4(c * a, a);                // premultiplied
@@ -114,6 +126,7 @@ let outerRadius = tolerance
 // darkened green) removed.
 let spillLo = CGFloat(Double(ProcessInfo.processInfo.environment["CHROMA_SPILL_LO"] ?? "") ?? 0.02)
 let spillHi = CGFloat(Double(ProcessInfo.processInfo.environment["CHROMA_SPILL_HI"] ?? "") ?? 0.07)
+let darkProtect = CGFloat(Double(ProcessInfo.processInfo.environment["CHROMA_DARK_PROTECT"] ?? "") ?? -1)
 
 // How far the removed green cast is pushed toward orange (vs grey). 0 = neutral
 // despill (default, for the Home/Lock In clips); ~0.9 warms a flame's glow.
@@ -148,7 +161,7 @@ func key(_ image: CIImage) -> CIImage {
     // else green. Picks the right spill/despill axis with no flag to set.
     let keyIsBlue: CGFloat = (keyColor.z > keyColor.x && keyColor.z > keyColor.y) ? 1 : 0
     return kernel.apply(extent: image.extent,
-                        arguments: [image, keyColor, innerRadius, outerRadius, despill, spillLo, spillHi, keyIsBlue])!
+                        arguments: [image, keyColor, innerRadius, outerRadius, despill, spillLo, spillHi, keyIsBlue, darkProtect])!
 }
 
 /// Average of the four corner pixels of a BGRA pixel buffer, in 0..1 sRGB — the

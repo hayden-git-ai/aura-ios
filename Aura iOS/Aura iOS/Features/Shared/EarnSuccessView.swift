@@ -157,7 +157,7 @@ struct EarnStatTile<Icon: View>: View {
                 .frame(height: 44)
 
             Text(value)
-                .auraFont(.display, SheetType.banner, .bold)
+                .auraFont(.body, SheetType.banner, .bold)
                 .foregroundStyle(.white)
                 .monospacedDigit()
                 .multilineTextAlignment(.center)

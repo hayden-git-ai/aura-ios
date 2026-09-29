@@ -14,8 +14,6 @@ struct SettingsScreen: View {
     @Environment(\.openURL) private var openURL
     @Environment(\.dismiss) private var dismiss
 
-    @AppStorage(PostHogBootstrap.consentKey) private var analyticsEnabled = false
-    @State private var aiConsentRevoked = false
     @State private var showEditProfile = false
     /// Turning Hard Mode OFF opens the hold-to-confirm sheet (it undoes a
     /// commitment), so the toggle only flips off once the hold completes.
@@ -43,7 +41,7 @@ struct SettingsScreen: View {
 
     /// Art-slot sizes, named per DESIGN.md §2/§12 rather than inlined. The two
     /// social glyphs differ so each reads balanced in the 56pt disc.
-    private static let rowIconSize: CGFloat = 34
+    private static let rowIconSize: CGFloat = 38
     private static let socialDiscSize: CGFloat = 56
     private static let instagramGlyphSize: CGFloat = 38
     private static let tiktokGlyphSize: CGFloat = 23
@@ -62,12 +60,12 @@ struct SettingsScreen: View {
                     // row(s) change with sign-in state.
                     sectionHeader("Account", store.isSignedIn
                         ? "Signed in as \(store.email.isEmpty ? store.displayName : store.email)."
-                        : "Sign in to save your progress and message the founders.")
+                        : "Sign in to save your progress.")
                         // Subtitle shows the email; keep it out of session replays.
                         .maskedInReplays()
                     VStack(spacing: Theme.Spacing.m) {
                         card {
-                            navRow(sticker: "FoxSettingsProfile", title: "Profile",
+                            navRow(sticker: "NavProfileSticker", title: "Profile",
                                    value: store.displayName) {
                                 showEditProfile = true
                             }
@@ -75,25 +73,25 @@ struct SettingsScreen: View {
                         // The Profile row shows the display name.
                         .maskedInReplays()
                         card {
-                            navRow(sticker: "FoxSettingsManageSubscription", title: "Manage subscription") {
+                            navRow(sticker: "SettingsManageSubscription", title: "Manage subscription") {
                                 showSubscription = true
                             }
                         }
                         if store.isSignedIn {
                             card {
-                                navRow(sticker: "FoxSettingsProfile", title: "Sign out") {
+                                navRow(sticker: "SettingsName", title: "Sign out") {
                                     showSignOutConfirm = true
                                 }
                             }
                             card {
-                                navRow(sticker: "FoxSettingsBugReport",
+                                navRow(sticker: "SettingsBugReport",
                                        title: deleting ? "Deleting…" : "Delete account") {
                                     if !deleting { showDeleteConfirm = true }
                                 }
                             }
                         } else {
                             card {
-                                navRow(sticker: "FoxSettingsProfile", title: "Sign in") {
+                                navRow(sticker: "SettingsName", title: "Sign in") {
                                     showSignIn = true
                                 }
                             }
@@ -105,65 +103,44 @@ struct SettingsScreen: View {
                         remindersCard
                         hardModeCard
                         card {
-                            navRow(sticker: "FoxSettingsInterventionStyle", title: "Intervention style") {
+                            navRow(sticker: "SettingsInterventionStyle", title: "Intervention style") {
                                 showInterventions = true
                             }
                         }
                     }
-
                     sectionHeader("Support", "Need help? Reach out or leave us feedback!")
                     VStack(spacing: Theme.Spacing.m) {
                         card {
-                            navRow(sticker: "FoxSettingsHelp", title: "Help") {
+                            navRow(sticker: "SettingsHelp", title: "Help") {
                                 openURL(AuraLink.help)
                             }
                         }
                         card {
-                            navRow(sticker: "FoxSettingsRequestFeature", title: "Request a feature") {
+                            navRow(sticker: "SettingsRequestFeature", title: "Request a feature") {
                                 openURL(AuraLink.requestFeature)
                             }
                         }
                         card {
-                            navRow(sticker: "FoxSettingsBugReport", title: "Report a bug") {
+                            navRow(sticker: "SettingsBugReport", title: "Report a bug") {
                                 showSupportChat = true
                             }
                         }
                         card {
-                            navRow(sticker: "FoxSettingsContact", title: "Contact us") {
+                            navRow(sticker: "SettingsContactUs", title: "Contact us") {
                                 showSupportChat = true
                             }
-                        }
-                    }
-
-                    sectionHeader("Privacy", "Choose what you share with Aura.")
-                    card {
-                        VStack(alignment: .leading, spacing: Theme.Spacing.m) {
-                            Toggle("Share usage analytics", isOn: $analyticsEnabled)
-                                .onChange(of: analyticsEnabled) { _, enabled in
-                                    PostHogBootstrap.setEnabled(enabled)
-                                }
-                            Text("Optional: send app interactions and device information to PostHog to help improve Aura. Session recordings are disabled. Turn this off at any time to stop future collection.")
-                                .font(.footnote)
-                                .foregroundStyle(LightSheet.subtitle)
-                            Button(aiConsentRevoked ? "Photo sharing permission reset" : "Reset AI Photo Proof permission") {
-                                PhotoProofAIConsent.revoke(for: store.isSignedIn ? SupabaseManager.shared.currentUserID : nil)
-                                aiConsentRevoked = true
-                            }
-                            Text("Photo Proof will ask again before sending another photo to Google Gemini or OpenAI. This does not delete photos already saved to your Wall of Wins or copies already processed by a provider.")
-                                .font(.footnote)
-                                .foregroundStyle(LightSheet.subtitle)
                         }
                     }
 
                     sectionHeader("Legal", "Privacy and terms.")
                     VStack(spacing: Theme.Spacing.m) {
                         card {
-                            navRow(sticker: "FoxSettingsPrivacy", title: "Privacy Policy") {
+                            navRow(sticker: "SettingsPrivacyPolicy", title: "Privacy Policy") {
                                 openURL(AuraLink.privacy)
                             }
                         }
                         card {
-                            navRow(sticker: "FoxSettingsTerms", title: "Terms & Conditions") {
+                            navRow(sticker: "SettingsTermsConditions", title: "Terms & Conditions") {
                                 openURL(AuraLink.terms)
                             }
                         }
@@ -231,7 +208,7 @@ struct SettingsScreen: View {
         // Mode exists to remove.
         .sheet(isPresented: $confirmingExitHardMode) {
             HoldConfirmSheet(
-                sticker: "DifficultyHard",
+                sticker: "SettingsDifficulty",
                 title: "Leave Hard Mode?",
                 subtitle: "Your weekly Scroll Pass comes back, and Aura can be deleted again.",
                 idleCaption: "Press and hold to leave",
@@ -266,12 +243,7 @@ struct SettingsScreen: View {
             Spacer(minLength: Theme.Spacing.s)
 
             Button { dismiss() } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(LightSheet.subtitleDark)
-                    .frame(width: Self.closeDiscSize, height: Self.closeDiscSize)
-                    .background(LightSheet.chromeOnLight, in: Circle())
-                    // 36pt disc, 44pt hit area (Apple minimum).
+                WoodButtonArtwork(role: .close)
                     .frame(width: 44, height: 44)
                     .contentShape(Circle())
             }
@@ -457,7 +429,7 @@ struct SettingsScreen: View {
                                          value: "\(store.healthCollectCount)", label: "Times collected")
                             EarnStatTile(icon: { EarnTileIcon(asset: "EarnCardIcon") },
                                          value: "+24", label: "Coins earned")
-                            EarnStatTile(icon: { EarnTileIcon(asset: "StreakFireIcon") },
+                            EarnStatTile(icon: { EarnTileIcon(asset: "StreakFlame") },
                                          value: "\(store.streak.currentStreak)", label: "Day streak")
                         }
                         .fixedSize(horizontal: false, vertical: true)
@@ -520,7 +492,7 @@ struct SettingsScreen: View {
         card {
             HStack(spacing: Theme.Spacing.s) {
                 HStack(spacing: Theme.Spacing.m) {
-                    Image("FoxSettingsReminders")
+                    Image("SettingsReminders")
                         .resizable()
                         .interpolation(.high)
                         .scaledToFit()
@@ -572,7 +544,7 @@ struct SettingsScreen: View {
                 // Mirrors `rowLabel`: same sticker slot, same title size/colour as
                 // every other settings row, with a subtext line added under it.
                 HStack(spacing: Theme.Spacing.m) {
-                    Image("DifficultyHard")
+                    Image("SettingsDifficulty")
                         .resizable()
                         .interpolation(.high)
                         .scaledToFit()
@@ -616,7 +588,10 @@ struct SettingsScreen: View {
     }
 
     private func navRow(sticker: String, title: String, value: String? = nil, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+        Button {
+            Haptics.impact(.light)
+            action()
+        } label: {
             HStack(spacing: Theme.Spacing.s) {
                 rowLabel(sticker: sticker, title: title)
                 Spacer(minLength: Theme.Spacing.s)

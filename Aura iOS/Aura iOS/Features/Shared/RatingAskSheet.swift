@@ -18,6 +18,7 @@ import SwiftUI
 /// behind it: almost nobody fills those in, and putting one there makes the
 /// honest answer feel like the punished one.
 struct RatingAskSheet: View {
+    private static let artHeight: CGFloat = 136
     var onYes: () -> Void
     var onNo: () -> Void
 
@@ -48,7 +49,10 @@ struct RatingAskSheet: View {
 
                 LightPrimaryButton(title: "Yes, I love it!", action: onYes)
 
-                Button(action: onNo) {
+                Button {
+                    Haptics.impact(.light)
+                    onNo()
+                } label: {
                     Text("Not really")
                         .auraFont(.body, SheetType.cardTitle, .semibold)
                         .foregroundStyle(LightSheet.controlIdle)
@@ -71,7 +75,7 @@ struct RatingAskSheet: View {
             .resizable()
             .interpolation(.high)
             .scaledToFit()
-            .frame(height: 120)
+            .frame(height: Self.artHeight)
             .foxShadow()
             .padding(.bottom, -Theme.Spacing.l)
     }

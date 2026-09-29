@@ -257,7 +257,7 @@ final class SupportChatStore {
         Task {
             guard isCurrent(ownerID: ownerID, revision: revision) else { return }
             let ok = await SupabaseManager.shared.sendSupportMessage(
-                text, expectedUserID: ownerID)
+                text, messageID: id, expectedUserID: ownerID)
             guard isCurrent(ownerID: ownerID, revision: revision) else { return }
             setDelivery(id, ok ? .sent : .failed)
         }
@@ -303,7 +303,7 @@ final class SupportChatStore {
                 persist()
             }
             let ok = await SupabaseManager.shared.sendSupportMessage(
-                "", mediaURL: url, mediaMime: mime, mediaName: filename,
+                "", messageID: id, mediaURL: url, mediaMime: mime, mediaName: filename,
                 expectedUserID: ownerID)
             guard isCurrent(ownerID: ownerID, revision: revision) else { return }
             setDelivery(id, ok ? .sent : .failed)
@@ -330,8 +330,7 @@ final class SupportChatStore {
     /// A file extension for a mime, so a retry re-uploads with the right suffix.
     private static func ext(for mime: String) -> String {
         switch mime {
-        case "video/mp4": return "mp4"
-        case "audio/m4a": return "m4a"
+        case "audio/m4a", "audio/mp4", "audio/x-m4a": return "m4a"
         case let m where m.hasPrefix("image/"): return "jpg"
         default: return "dat"
         }
@@ -340,8 +339,12 @@ final class SupportChatStore {
     /// Sets a message's delivery state and persists (state is part of the local copy).
     private func setDelivery(_ id: UUID, _ state: SupportMessage.Delivery) {
         guard let i = messages.firstIndex(where: { $0.id == id }) else { return }
+        let oldState = messages[i].delivery
         messages[i].delivery = state
         persist()
+        guard oldState != state else { return }
+        if state == .sent { Haptics.notify(.success) }
+        if state == .failed { Haptics.notify(.error) }
     }
 
     /// Loads the whole thread from the server and merges what is new. History (the
@@ -480,6 +483,7 @@ struct SupportChatView: View {
     @State private var recorder = VoiceRecorder()
     /// A finished recording awaiting review (play back / delete / send).
     @State private var recordedPreview: URL?
+    @State private var attachmentError: String?
     /// Booking / links open in an in-app browser (Cal.com booking, the founders card).
     @State private var browserLink: BrowserLink?
     /// Full-picker: whether the Collections (albums) tab is showing, and the name of
@@ -527,6 +531,7 @@ struct SupportChatView: View {
                 Color.black.opacity(0.25)
                     .ignoresSafeArea()
                     .onTapGesture {
+                        Haptics.impact(.light)
                         withAnimation(.spring(response: 0.34, dampingFraction: 0.82)) { showAttachMenu = false }
                     }
             }
@@ -554,7 +559,7 @@ struct SupportChatView: View {
                             }
                         )
                 }
-                .ignoresSafeArea(edges: .bottom)
+                .ignoresSafeArea(.container, edges: .bottom)
             }
 
             if showFullPicker { fullPicker }
@@ -590,6 +595,11 @@ struct SupportChatView: View {
             resetComposerForAccountChange()
             signedIn = accountID != nil && accountID == SupabaseManager.shared.currentUserID
         }
+        .onChange(of: recorder.autoFinishedURL) { _, url in
+            guard let url else { return }
+            recordedPreview = url
+            recorder.clearAutoFinishedURL()
+        }
         .fullScreenCover(isPresented: $showSignIn) {
             AccountSignInSheet(onSignedIn: {
                 // HabitStore owns the authoritative identity switch. A stale sheet
@@ -609,6 +619,14 @@ struct SupportChatView: View {
             Button("Not now", role: .cancel) {}
         } message: {
             Text("You need an account to send messages to the founders.")
+        }
+        .alert("Attachment unavailable", isPresented: Binding(
+            get: { attachmentError != nil },
+            set: { if !$0 { attachmentError = nil } }
+        )) {
+            Button("OK", role: .cancel) { attachmentError = nil }
+        } message: {
+            Text(attachmentError ?? "Please try again.")
         }
         .task(id: chat.accountID) {
             // The booking card is fully static (bundled image + title), so no
@@ -689,11 +707,10 @@ struct SupportChatView: View {
             HStack {
                 headerCircleButton(systemName: "chevron.left", label: "Back") { dismiss() }
                 Spacer()
-                // Book a call with the founders — like iMessage's FaceTime button,
-                // built identically to the back button. Opens the Cal.com booking
-                // straight in the in-app browser.
-                headerCircleButton(systemName: "calendar", label: "Book a call") {
-                    Haptics.impact(.light)
+                // Book a call with the founders. This uses the same approved,
+                // engraved bell artwork as the routine controls elsewhere in Aura;
+                // only its action and accessibility label are chat-specific.
+                headerCircleButton(systemName: "bell", label: "Book a call") {
                     browserLink = BrowserLink(url: Self.foundersBookingURL)
                 }
             }
@@ -707,7 +724,15 @@ struct SupportChatView: View {
     /// identical in size, material, and vertical position (only the glyph differs).
     private func headerCircleButton(systemName: String, label: String,
                                     action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+        Button {
+            Haptics.impact(.light)
+            action()
+        } label: {
+            if systemName == "chevron.left" || systemName == "bell" {
+                WoodButtonArtwork(role: systemName == "bell" ? .routine : .back)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Circle())
+            } else {
             Image(systemName: systemName)
                 .font(.system(size: 17, weight: .bold))
                 .foregroundStyle(.white)
@@ -717,8 +742,9 @@ struct SupportChatView: View {
                 // 40pt disc, 44pt hit area (Apple minimum), like OnbTopBar.
                 .frame(width: 44, height: 44)
                 .contentShape(Circle())
+            }
         }
-        .buttonStyle(PressBounceStyle())
+        .buttonStyle(PressBounceStyle(hapticsEnabled: false))
         .accessibilityLabel(label)
     }
 
@@ -810,7 +836,10 @@ struct SupportChatView: View {
                 .padding(.top, 104)
                 // Content inset (not a frame clip) so the newest message rests above
                 // the bar while bubbles still scroll behind it.
-                .padding(.bottom, bottomBarHeight + Theme.Spacing.s)
+                // The short seeded conversation is bottom-anchored like Messages.
+                // Give it a little more room above the composer so the timestamp
+                // and welcome copy rest higher instead of crowding the lower half.
+                .padding(.bottom, bottomBarHeight + Theme.Spacing.xxl)
                 .animation(.spring(response: 0.38, dampingFraction: 0.82), value: chat.messages.count)
                 .animation(.easeOut(duration: 0.2), value: chat.isTeamTyping)
             }
@@ -1044,12 +1073,13 @@ struct SupportChatView: View {
                     .foregroundStyle(.white)
                     .tint(.white)
                     .focused($composerFocused)
-                    .lineLimit(1...5)
+                    .lineLimit(1...3)
                 trailingControl
             }
             .padding(.leading, 16)
             .padding(.trailing, 6)
             .padding(.vertical, 6)
+            .frame(minHeight: 44)
         }
         // Drag the message field down to close the photo sheet. Lives here (not on
         // the whole composer) so it can't swallow taps on the + / Camera / Photos.
@@ -1317,15 +1347,11 @@ struct SupportChatView: View {
     /// sheet on tap (frame + corner + content animate together, the streak-freeze
     /// technique). The footprint stays 44×44 so the input bar never shifts; the
     /// expanded sheet overflows up and to the right from the button's bottom-left.
-    /// Release offers only image types accepted by the live Storage bucket.
-    /// Debug keeps the later-phase attachment controls available for development.
+    /// The production attachment contract includes camera/photos, voice notes,
+    /// and imported files. The server validates the same MIME/size allowlist.
     private static let attachRowHeight: CGFloat = 52
     private var menuHeight: CGFloat {
-        #if DEBUG
         CGFloat(cameraAvailable ? 4 : 3) * Self.attachRowHeight
-        #else
-        CGFloat(cameraAvailable ? 2 : 1) * Self.attachRowHeight
-        #endif
     }
 
     private var attachMenuButton: some View {
@@ -1342,10 +1368,8 @@ struct SupportChatView: View {
                                 attachRow(icon: "camera.fill", label: "Camera") { selectCamera() }
                             }
                             attachRow(icon: "photo.fill", label: "Photos") { selectPhotos() }
-                            #if DEBUG
                             attachRow(icon: "waveform", label: "Audio") { selectVoice() }
                             attachRow(icon: "doc.fill", label: "Files") { selectFiles() }
-                            #endif
                         }
                     } else {
                         // One persistent control: the "+" opens the attach menu, and
@@ -1415,7 +1439,10 @@ struct SupportChatView: View {
         withAnimation(.easeOut(duration: 0.2)) { showPhotosGrid = false }
         let context = chat.identityContext
         Task {
-            guard await recorder.requestPermission() else { return }
+            guard await recorder.requestPermission() else {
+                attachmentError = "Microphone access is off. Turn it on in Settings to record a voice note."
+                return
+            }
             guard !Task.isCancelled, chat.isCurrent(context), context.accountID != nil else { return }
             // No withAnimation — `trailingPill` animates its scale/fade implicitly on
             // `composerMode`, exactly like the mic ⇄ send control does on `canSend`.
@@ -1435,9 +1462,18 @@ struct SupportChatView: View {
         guard let url = recordedPreview else { return }
         Haptics.impact(.light)
         defer { try? FileManager.default.removeItem(at: url) }
-        guard let data = try? Data(contentsOf: url) else { recordedPreview = nil; return }
+        guard let data = try? Data(contentsOf: url) else {
+            attachmentError = "Aura couldn't read that recording."
+            recordedPreview = nil
+            return
+        }
+        guard data.count <= 10 * 1024 * 1024 else {
+            attachmentError = "Voice notes must be 10 MB or smaller."
+            recordedPreview = nil
+            return
+        }
         recordedPreview = nil
-        chat.sendMedia(data, mime: "audio/m4a", ext: "m4a", filename: "voice-note.m4a")
+        chat.sendMedia(data, mime: "audio/mp4", ext: "m4a", filename: "voice-note.m4a")
     }
 
     /// Throws the reviewed voice note away.
@@ -1456,10 +1492,23 @@ struct SupportChatView: View {
         guard chat.isCurrent(context), context.accountID != nil else { return }
         let scoped = url.startAccessingSecurityScopedResource()
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-        guard let data = try? Data(contentsOf: url) else { return }
+        guard let data = try? Data(contentsOf: url) else {
+            attachmentError = "Aura couldn't read that file."
+            return
+        }
         guard !Task.isCancelled, chat.isCurrent(context) else { return }
-        let ext = url.pathExtension.isEmpty ? "dat" : url.pathExtension
-        let mime = UTType(filenameExtension: ext)?.preferredMIMEType ?? "application/octet-stream"
+        let ext = url.pathExtension.isEmpty ? "dat" : url.pathExtension.lowercased()
+        let rawMime = UTType(filenameExtension: ext)?.preferredMIMEType ?? "application/octet-stream"
+        let mime = ["audio/m4a", "audio/x-m4a"].contains(rawMime) ? "audio/mp4" : rawMime
+        let allowedExtensions = Set(["pdf", "txt", "m4a", "aac", "mp3", "wav", "jpg", "jpeg", "png", "heic", "heif"])
+        guard allowedExtensions.contains(ext) else {
+            attachmentError = "That file type isn't supported. Choose a PDF, text, audio, or image file."
+            return
+        }
+        guard data.count <= 10 * 1024 * 1024 else {
+            attachmentError = "Files must be 10 MB or smaller."
+            return
+        }
         chat.sendMedia(data, mime: mime, ext: ext, filename: url.lastPathComponent)
     }
 
@@ -1501,41 +1550,21 @@ struct SupportChatView: View {
 
     private func sendAssets(_ assets: [PHAsset], context: SupportChatStore.IdentityContext) async {
         guard chat.isCurrent(context), context.accountID != nil else { return }
-        #if DEBUG
-        for asset in assets {
-            if asset.mediaType == .video {
-                if let data = await mediaStore.exportVideoData(asset) {
-                    guard !Task.isCancelled, chat.isCurrent(context) else { return }
-                    chat.sendMedia(data, mime: "video/mp4", ext: "mp4", filename: "video.mp4")
-                }
-            } else if let data = await mediaStore.exportImageJPEG(asset) {
-                guard !Task.isCancelled, chat.isCurrent(context) else { return }
-                chat.sendMedia(data, mime: "image/jpeg", ext: "jpg", filename: "photo.jpg")
-            }
-        }
-        #else
         for asset in assets where asset.mediaType == .image {
             if let data = await mediaStore.exportImageJPEG(asset) {
                 guard !Task.isCancelled, chat.isCurrent(context) else { return }
                 chat.sendMedia(data, mime: "image/jpeg", ext: "jpg", filename: "photo.jpg")
             }
         }
-        #endif
     }
 
-    /// A camera capture (photo or video), sent immediately.
+    /// An image camera capture, sent immediately.
     private func stageCaptured(_ data: Data, isVideo: Bool) {
-        #if !DEBUG
         guard !isVideo else { return }
-        #endif
         guard let context = cameraIdentityContext,
               chat.isCurrent(context), context.accountID != nil else { return }
         cameraIdentityContext = nil
-        if isVideo {
-            chat.sendMedia(data, mime: "video/mp4", ext: "mp4", filename: "video.mp4")
-        } else {
-            chat.sendMedia(data, mime: "image/jpeg", ext: "jpg", filename: "photo.jpg")
-        }
+        chat.sendMedia(data, mime: "image/jpeg", ext: "jpg", filename: "photo.jpg")
     }
 }
 
@@ -1636,6 +1665,7 @@ final class VoiceRecorder {
     private var recorder: AVAudioRecorder?
     private var ticker: Timer?
     private var fileURL: URL?
+    private(set) var autoFinishedURL: URL?
 
     /// Requests mic permission (once); returns whether it's granted.
     func requestPermission() async -> Bool {
@@ -1660,7 +1690,7 @@ final class VoiceRecorder {
         ]
         guard let rec = try? AVAudioRecorder(url: url, settings: settings) else { return }
         rec.isMeteringEnabled = true
-        guard rec.record() else { return }
+        guard rec.record(forDuration: 120) else { return }
         recorder = rec
         fileURL = url
         elapsed = 0
@@ -1679,6 +1709,12 @@ final class VoiceRecorder {
     private func sample() {
         guard let rec = recorder else { return }
         elapsed = rec.currentTime
+        if elapsed >= 120 {
+            let url = fileURL
+            stopInternal()
+            autoFinishedURL = url
+            return
+        }
         rec.updateMeters()
         // dBFS (~ -60...0) → a lively 0...1 amplitude.
         let power = rec.averagePower(forChannel: 0)
@@ -1699,6 +1735,8 @@ final class VoiceRecorder {
         stopInternal()
         cancelFile()
     }
+
+    func clearAutoFinishedURL() { autoFinishedURL = nil }
 
     private func cancelFile() {
         if let url = fileURL { try? FileManager.default.removeItem(at: url) }
@@ -1793,8 +1831,7 @@ private nonisolated func audioWaveform(from data: Data, buckets: Int) -> [CGFloa
     return rms.map { CGFloat(max(0.08, min(1, $0 / peak))) }
 }
 
-/// A camera sheet that captures an image in Release. Debug also exposes the
-/// later-phase video path while its Storage policy is being developed.
+/// A camera sheet that captures images supported by the attachment contract.
 private struct CameraPicker: UIViewControllerRepresentable {
     var onCaptured: (Data, Bool) -> Void
     @Environment(\.dismiss) private var dismiss
@@ -1802,12 +1839,7 @@ private struct CameraPicker: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> UIImagePickerController {
         let picker = UIImagePickerController()
         picker.sourceType = .camera
-        #if DEBUG
-        picker.mediaTypes = ["public.image", "public.movie"]
-        picker.videoQuality = .typeMedium
-        #else
         picker.mediaTypes = ["public.image"]
-        #endif
         picker.delegate = context.coordinator
         return picker
     }
@@ -1819,9 +1851,7 @@ private struct CameraPicker: UIViewControllerRepresentable {
         init(_ parent: CameraPicker) { self.parent = parent }
         func imagePickerController(_ picker: UIImagePickerController,
                                    didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
-            if let url = info[.mediaURL] as? URL, let data = try? Data(contentsOf: url) {
-                parent.onCaptured(data, true)
-            } else if let image = info[.originalImage] as? UIImage,
+            if let image = info[.originalImage] as? UIImage,
                       let jpeg = image.jpegData(compressionQuality: 0.8) {
                 parent.onCaptured(jpeg, false)
             }
@@ -2370,7 +2400,10 @@ private struct SupportBubble: View {
             if !isBareLink(url) { textBubble }
             RichLinkPreview(url: url, width: Self.maxContentWidth)
                 .contentShape(Rectangle())
-                .onTapGesture { openURL(url) }
+                .onTapGesture {
+                    Haptics.impact(.light)
+                    openURL(url)
+                }
         }
     }
 

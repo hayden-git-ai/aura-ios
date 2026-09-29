@@ -141,7 +141,7 @@ struct OnbNameView: View {
                         .autocorrectionDisabled()
                         .submitLabel(.continue)
                         .focused($focused)
-                        .onSubmit { if !flow.firstName.isEmpty { react() } }
+                        .onSubmit { if ProfileIdentity.isValidName(flow.name) { react() } }
                         .auraFont(.body, 17, .medium)
                         .foregroundStyle(.white)
                         .overlay(alignment: .leading) {
@@ -159,7 +159,7 @@ struct OnbNameView: View {
             bottom: {
                 LightPrimaryButton(title: "Continue",
                                    face: .white, textColor: LightSheet.title, shade: LightSheet.whiteShadeOnColour,
-                                   enabled: ready && (reacting || !flow.firstName.isEmpty)) {
+                                   enabled: ready && (reacting || ProfileIdentity.isValidName(flow.name))) {
                     if reacting { finish() } else { react() }
                 }
             }

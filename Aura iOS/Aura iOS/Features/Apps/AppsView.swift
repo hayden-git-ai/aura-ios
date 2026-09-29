@@ -77,19 +77,16 @@ struct AppsView: View {
                 .fixedSize()
                 .shadow(color: .black.opacity(0.22), radius: 5, y: 2)
             Spacer()
-            // The help mark is a big bare glyph (no disc) so it reads more like a
-            // game than a settings control.
+            // Shared wooden help button; the help sheet action is unchanged.
             Button {
                 Haptics.impact(.light)
                 showHelp = true
             } label: {
-                Image("FoxSettingsHelp")
-                    .resizable()
-                    .interpolation(.high)
-                    .scaledToFit()
+                WoodButtonArtwork(role: .help)
                     .frame(width: 44, height: 44)
+                    .contentShape(Circle())
             }
-            .buttonStyle(PressBounceStyle())
+            .buttonStyle(PressBounceStyle(hapticsEnabled: false))
         }
         .padding(.horizontal, Theme.Spacing.xl)
         .padding(.top, TabTopCardMetrics.topInset)
@@ -127,7 +124,7 @@ struct AppsView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: Theme.Spacing.l) {
                         ForEach(Array(store.blockedNowIcons.enumerated()), id: \.offset) { idx, icon in
-                            FrozenAppTile(icon: icon, side: 50,
+                            FrozenAppTile(icon: icon, side: 56,
                                           tilt: Self.frozenTilts[idx % Self.frozenTilts.count])
                         }
                     }
@@ -157,14 +154,6 @@ struct AppsView: View {
     /// is where the reload lives in words.
     private var emptyState: some View {
         VStack(spacing: Theme.Spacing.m) {
-            // The lock, not the fox — the fox already carries the rest of the
-            // screen, so the empty state uses the Defense tab's own emblem.
-            Image("AuraNavBlockLock")
-                .resizable()
-                .interpolation(.high)
-                .scaledToFit()
-                .frame(height: 92)
-
             VStack(spacing: Theme.Spacing.xs) {
                 Text(store.isDistractingLifted ? "All apps are open" : "Nothing frozen yet")
                     .auraFont(.display, SheetType.sectionHeader, .bold)

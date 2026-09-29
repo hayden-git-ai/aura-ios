@@ -56,24 +56,20 @@ struct ExerciseHelpSheet: View {
         }
     }
 
-    /// `LightSubSheetHeader` composed by hand, because the art has to sit
-    /// between the drag capsule and the title and the shared header has no slot
-    /// for it. Type and spacing are copied from it exactly.
+    /// `LightSubSheetHeader` composed by hand so this reads as the same header
+    /// as the other help sheets.
     private var header: some View {
         VStack(spacing: 0) {
             LightDragCapsule()
 
-            art
-                .padding(.top, Theme.Spacing.l)
-
-            Text("How this works")
+            Text("How Daily Exercises Work")
                 .auraFont(.display, SheetType.title, .bold)
                 .foregroundStyle(LightSheet.title)
                 .frame(maxWidth: .infinity)
                 .padding(.horizontal, Theme.Spacing.xl)
-                .padding(.top, Theme.Spacing.xl)
+                .padding(.top, Theme.Spacing.l)
 
-            Text("Set your phone down and Aura counts for you.")
+            Text("Move in front of your camera and earn as you go.")
                 .auraFont(.body, SheetType.subtitle, .regular)
                 .foregroundStyle(SheetType.subtitleColor)
                 .multilineTextAlignment(.center)
@@ -81,15 +77,6 @@ struct ExerciseHelpSheet: View {
                 .padding(.horizontal, Theme.Spacing.xxl)
                 .padding(.top, Theme.Spacing.xs)
         }
-    }
-
-    private var art: some View {
-        Image("FoxHowItWorks")
-            .resizable()
-            .interpolation(.high)
-            .scaledToFit()
-            .frame(height: 140)
-            .foxShadow()
     }
 
     /// Identical construction to `StepsExplainerSheet.row`, so a step reads the

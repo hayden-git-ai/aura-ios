@@ -68,8 +68,9 @@ final class OnboardingFlow {
     /// intact in `fullSteps` (and every `Step` case still exists) for a future v2;
     /// switch `steps` back to `fullSteps` to restore it.
     static let launchSteps: [Step] = [
-        .welcome, .meet, .name, .qGoal, .qSlider, .loopDemo,
-        .demoFreeze, .demoEarn, .demoSpend, .qHabits, .qCustomPlan, .qCommit,
+        .welcome, .qGoal, .qPersona, .age, .name,
+        .qFeelings, .qWorstTime, .qHabits, .qLoading, .qCustomPlan, .qReviews,
+        .qCommit,
     ]
     /// The complete onboarding, in declared enum order.
     static let fullSteps: [Step] = Step.allCases

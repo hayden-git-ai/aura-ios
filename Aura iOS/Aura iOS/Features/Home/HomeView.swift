@@ -12,6 +12,12 @@ import UIKit
 /// counting down until apps unlock), the unlocked countdown, or the locked
 /// "earn time" prompt.
 struct HomeView: View {
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var purchaseCountupSeconds: Int?
+    @State private var showPurchaseActivationError = false
+    @State private var purchaseRetry = 0
+    @Environment(\.displayScale) private var displayScale
     /// The countdown above the fox.
     private static let countdownSize: CGFloat = 34
     @Environment(HabitStore.self) private var store
@@ -77,7 +83,7 @@ struct HomeView: View {
                 } label: {
                     StreakBadge(count: store.streak.currentStreak)
                 }
-                .buttonStyle(PressBounceStyle())
+                .buttonStyle(PressBounceStyle(hapticsEnabled: false))
                 .padding(.top, Theme.Spacing.l)
                 .padding(.trailing, Theme.Spacing.xl)
             }
@@ -142,6 +148,15 @@ struct HomeView: View {
         // numeral and the earn grid are all fixed geometry that type grows
         // inside, not layout that reflows around it.
         .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+        .task(id: purchasePresentationKey) {
+            await presentPendingScreenTime()
+        }
+        .alert("Couldn't start screentime", isPresented: $showPurchaseActivationError) {
+            Button("Try again") { purchaseRetry += 1 }
+            Button("Later", role: .cancel) {}
+        } message: {
+            Text("Your purchased minutes are saved. You can try again without spending more coins.")
+        }
     }
 
     /// Whether the Distracting apps are shut right now — the one thing that sets
@@ -149,7 +164,8 @@ struct HomeView: View {
     /// session) AND there are actually distracting apps to lock. Forbidden apps
     /// stay blocked forever, so they're deliberately left out.
     private var distractingBlockedNow: Bool {
-        !store.isDistractingLifted && !store.blockConfig[.distracting].iconSources.isEmpty
+        store.pendingScreenTimePurchase == nil && !store.isDistractingLifted
+            && !store.blockConfig[.distracting].iconSources.isEmpty
     }
 
     /// The centered focal — a big "time left" number, one status line, and the
@@ -208,8 +224,11 @@ struct HomeView: View {
     @ViewBuilder
     private func statusStack(blockedNow: [AppIconSource]) -> some View {
         VStack(spacing: Theme.Spacing.s) {
-            if let countdown = store.gateCountdown {
-                let isSession = store.activeHabitSession != nil
+            ForEach(Array(displayedCountdowns.enumerated()), id: \.offset) { _, countdown in
+                let isSession: Bool = {
+                    if case .untilFocusEnds = countdown { return true }
+                    return false
+                }()
                 VStack(spacing: RowType.labelGap) {
                     Text(countdown.caption)
                         .auraFont(.body, 13, .bold)
@@ -219,7 +238,7 @@ struct HomeView: View {
                     // Same sticker numeral as the streak count — UIKit-drawn,
                     // since SwiftUI Text can't stroke.
                     StrokedNumber(
-                        text: countdown.clock,
+                        text: countdown.seconds == 0 && store.pendingScreenTimePurchase != nil ? "00:00" : countdown.clock,
                         font: Typography.displayUIFont(size: Self.countdownSize, weight: .black, tabular: true),
                         fill: HomeDaylight.isDay() ? .white : .black,
                         stroke: HomeDaylight.isDay() ? UIColor(Theme.Color.background) : .white,
@@ -230,18 +249,85 @@ struct HomeView: View {
                 // Only a focus session has anything to open — bought time just
                 // burns down.
                 .contentShape(Rectangle())
-                .onTapGesture { if isSession { showSessionControls = true } }
+                .onTapGesture {
+                    guard isSession else { return }
+                    Haptics.impact(.light)
+                    showSessionControls = true
+                }
             }
 
-            if !blockedNow.isEmpty {
+            if !blockedNow.isEmpty && store.pendingScreenTimePurchase == nil && !store.isUnlocked
+                && store.activeHabitSession == nil && store.activeFocusSession == nil {
                 BlockedNowPill(icons: blockedNow) { showBlockedApps = true }
             }
         }
     }
 
-    /// Today's charge: the spendable coin balance (earned today minus spent, so
-    /// it climbs on earn and drops when screen time is bought, resetting at
-    /// midnight on its own) as a big coin + number over a four-level charge bar.
+    private func purchasedSecondsRemaining(at date: Date) -> Int {
+        guard let deadline = store.unlockEndsAt else { return 0 }
+        return max(0, Int(ceil(deadline.timeIntervalSince(date))))
+    }
+
+    private var displayedCountdowns: [GateCountdown] {
+        var countdowns: [GateCountdown] = []
+        let pending = store.pendingScreenTimePurchase != nil
+        if pending {
+            countdowns.append(.untilAppsLock(seconds: purchaseCountupSeconds ?? purchasedSecondsRemaining(at: Date())))
+        } else if purchasedSecondsRemaining(at: store.now) > 0 {
+            countdowns.append(.untilAppsLock(seconds: purchasedSecondsRemaining(at: store.now)))
+        }
+        if let existing = store.gateCountdown, case .untilFocusEnds = existing {
+            countdowns.append(existing)
+        }
+        return countdowns
+    }
+
+    private var canPresentPurchasedTime: Bool {
+        scenePhase == .active && !showStore && !showStreak && !showSessionStreak
+            && !showRatingAsk && !showBlockedApps && !showSessionControls
+            && !store.isFlowPresented
+    }
+
+    private var purchasePresentationKey: String {
+        "\(store.pendingScreenTimePurchase?.id.uuidString ?? "none")-\(canPresentPurchasedTime)-\(purchaseRetry)"
+    }
+
+    @MainActor
+    private func presentPendingScreenTime() async {
+        guard canPresentPurchasedTime, let purchase = store.pendingScreenTimePurchase else { return }
+        do {
+            // Let the store cover finish dismissing before Home owns the reward.
+            try await Task.sleep(for: .milliseconds(350))
+            try Task.checkCancellation()
+            guard canPresentPurchasedTime else { return }
+            let start = purchasedSecondsRemaining(at: Date())
+            let began = Date()
+            let duration = reduceMotion ? 0.15 : 1.0
+            purchaseCountupSeconds = start
+            defer { purchaseCountupSeconds = nil }
+            while true {
+                try Task.checkCancellation()
+                guard canPresentPurchasedTime,
+                      store.pendingScreenTimePurchase?.id == purchase.id else { return }
+                let progress = min(1, Date().timeIntervalSince(began) / duration)
+                let eased = 1 - pow(1 - progress, 3)
+                let target = purchasedSecondsRemaining(at: Date()) + purchase.minutes * 60
+                purchaseCountupSeconds = start + Int(Double(target - start) * eased)
+                if progress >= 1 { break }
+                try await Task.sleep(for: .milliseconds(16))
+            }
+            if store.activatePendingScreenTimePurchase(id: purchase.id) {
+                Haptics.notify(.success)
+            } else if store.pendingScreenTimePurchase?.id == purchase.id {
+                showPurchaseActivationError = true
+                Haptics.notify(.error)
+            }
+        } catch {
+            // Leaving Home/backgrounding cancels only presentation, never payment.
+        }
+    }
+
+    /// Spendable balance above a separate, earnings-only daily progress bar.
     /// Not in a card — it sits directly on the home art, Brainrot-style.
     private var earnGoalBar: some View {
         let coins = store.coinBalance
@@ -257,8 +343,8 @@ struct HomeView: View {
                     // Glints straddling the coin's edge, half on and half off.
                     .overlay {
                         ZStack {
-                            IceSparkle(size: 17, delay: 0.0).position(x: 47, y: 10)
-                            IceSparkle(size: 11, delay: 0.8).position(x: 9, y: 44)
+                            IceSparkle(size: 17, delay: 0.0).position(x: 44.64, y: 12.24)
+                            IceSparkle(size: 11, delay: 0.8).position(x: 10.13, y: 43.05)
                         }
                         .frame(width: 56, height: 56)
                     }
@@ -273,7 +359,7 @@ struct HomeView: View {
                     .overlay(alignment: .topTrailing) { earnChip }
             }
 
-            chargeBar(coins: coins, claimed: store.claimedPowerUps)
+            chargeBar(coins: store.todayEarnedCoins, claimed: store.claimedPowerUps)
         }
         .overlay(alignment: .top) { powerUpPop }
         .onAppear {
@@ -311,7 +397,7 @@ struct HomeView: View {
         }
         #endif
         .onChange(of: store.pendingEarnPulse) { _, _ in playPendingEarn() }
-        .onChange(of: store.todayEarnedCoins) { _, _ in checkPowerUps() }
+        .onChange(of: store.todayEarnedCoins, initial: true) { _, _ in checkPowerUps() }
         .onChange(of: store.isFlowPresented) { _, presented in
             guard !presented else { return }
             // The cover takes about a third of a second to get out of the way.
@@ -457,14 +543,14 @@ struct HomeView: View {
     private static let chipGap: CGFloat = 3
 
     /// A four-level charge bar — one segment per power-up at 25/50/75/100 coins.
-    /// Each fills as coins come in and empties as they're spent; a claimed
+    /// Each fills as coins are earned and stays filled when spent; a claimed
     /// power-up keeps a gold ring so you can see which levels you've hit today.
     private func chargeBar(coins: Int, claimed: Set<Int>) -> some View {
         let levels = 4
         let per = 25
         let green = Theme.Color.earnBar
         let barH: CGFloat = 16
-        let nodeD: CGFloat = 30
+        let nodeD: CGFloat = 40
         let skullD: CGFloat = 40
         return GeometryReader { proxy in
             let gap: CGFloat = 4
@@ -482,7 +568,7 @@ struct HomeView: View {
                         let lower = i * per
                         let fill = min(1, max(0, Double(coins - lower) / Double(per)))
                         ZStack(alignment: .leading) {
-                            Capsule().fill(Color.black.opacity(0.28))
+                            Capsule().fill(Theme.Color.earnTrack)
                             Capsule()
                                 .fill(LinearGradient(colors: [green.lightened(by: 0.18), green, green.darkened(by: 0.10)],
                                                      startPoint: .top, endPoint: .bottom))
@@ -499,13 +585,14 @@ struct HomeView: View {
                 // last one lands on the bar's right end, not clamped inside it.
                 ForEach(0..<levels, id: \.self) { i in
                     let x = inset + CGFloat(i + 1) * segW + CGFloat(i) * gap
-                    powerUpNode(claimed: claimed.contains((i + 1) * per), diameter: nodeD)
+                    powerUpNode(reached: coins >= (i + 1) * per,
+                                claimed: claimed.contains((i + 1) * per), diameter: nodeD)
                         .position(x: x, y: proxy.size.height / 2)
                 }
 
                 // A skull marks the start (zero), one even step left of the first
                 // node.
-                Image("StatsMostDistracting")
+                Image("PowerUpSkull")
                     .resizable()
                     .interpolation(.high)
                     .scaledToFit()
@@ -516,27 +603,27 @@ struct HomeView: View {
         .frame(height: 30)
     }
 
-    /// A placeholder power-up node: a circular badge, grey when locked, gold when
-    /// claimed. The custom icon PNG replaces the bolt later.
-    private func powerUpNode(claimed: Bool, diameter: CGFloat) -> some View {
-        Image(systemName: "bolt.fill")
-            .font(.system(size: diameter * 0.5, weight: .black))
-            .foregroundStyle(claimed ? .white : Color.white.opacity(0.7))
+    /// All four milestones share the approved coin-pouch sticker.
+    private func powerUpNode(reached: Bool, claimed: Bool, diameter: CGFloat) -> some View {
+        Image("PowerUpCoinPouch")
+            .resizable()
+            .interpolation(.high)
+            .scaledToFit()
             .frame(width: diameter, height: diameter)
-            .background(Circle().fill(claimed ? Color.yellow : Color(white: 0.4)))
-            .overlay(Circle().strokeBorder(.white, lineWidth: 2))
-            .shadow(color: .black.opacity(0.35), radius: 2, y: 1)
+            .saturation(reached ? 1 : 0)
+            .accessibilityLabel(claimed ? "Power-up claimed" : reached ? "Power-up unlocked" : "Power-up locked")
     }
 
     /// The rising "Power up +N" pop shown when a threshold is claimed.
     @ViewBuilder private var powerUpPop: some View {
         if let bonus = powerUpBonusShown {
             HStack(spacing: 5) {
-                Image(systemName: "bolt.fill")
+                Image("PowerUpCoinPouch")
+                    .resizable().scaledToFit().frame(width: 28, height: 28)
                     .font(.system(size: 13, weight: .black))
                     .foregroundStyle(.yellow)
                 Text("Power up  +\(bonus)")
-                    .auraFont(.display, 14, .black)
+                    .auraFont(.body, 14, .black)
                     .foregroundStyle(.white)
             }
             .padding(.horizontal, 12)
@@ -562,30 +649,13 @@ struct HomeView: View {
         }
     }
 
-    /// The action tiles' surface — the SAME material as the streak disc behind
-    /// the flame (faint see-through in daylight, dark translucent at night), so
-    /// the two read as one family. Carries the soft lift the cards share.
-    private var actionCardMaterial: some View {
-        RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
-            .fill(HomeDaylight.isDay() ? Color.white.opacity(0.12) : Color.black.opacity(0.45))
-            .overlay {
-                if !HomeDaylight.isDay() {
-                    RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
-                        .fill(Color.white.opacity(0.08))
-                }
-            }
-            .shadow(color: .black.opacity(HomeDaylight.isDay() ? 0.12 : 0.20), radius: 10, y: 5)
-    }
-
     /// The two action tiles beneath the prompt — Quests / Scroll.
     private var actionCards: some View {
         HStack(spacing: Theme.Spacing.m) {
             // Earn opens the method popover, which grows from this card — its
             // frame is published via EarnAnchorKey for RootTabView to read.
             Button(action: onEarn) {
-                // The coin is round, so it reads smaller than the tall phone at
-                // an equal frame — size it up to balance them visually.
-                actionCard(title: "Quests", iconAsset: "EarnCardIcon", iconSize: 56)
+                actionCard(title: "Quests", iconAsset: "EarnCardIcon", palette: LightSheet.Achievement.coins, isPhone: false)
             }
             .buttonStyle(PressBounceStyle())
             .anchorPreference(key: EarnAnchorKey.self, value: .bounds) { $0 }
@@ -593,43 +663,63 @@ struct HomeView: View {
             // Scroll opens the Screentime Store (spend earned coins). Stays
             // open during a running session — buying again tops the timer up.
             Button {
+                Haptics.impact(.light)
                 showStore = true
             } label: {
-                actionCard(title: "Scroll", iconAsset: "ScrollCardIcon", iconSize: 56)
+                actionCard(title: "Scroll", iconAsset: "ScrollCardIcon", palette: LightSheet.Achievement.reps, isPhone: true)
             }
-            .buttonStyle(PressBounceStyle())
+            .buttonStyle(PressBounceStyle(hapticsEnabled: false))
         }
     }
 
-    /// Shared height of the icon slot across both cards. Each icon sizes itself
-    /// within this fixed slot, so a larger/smaller icon never shifts the label
-    /// or breaks alignment between the two cards.
-    private let actionIconSlot: CGFloat = 52
-
-    private func actionCard(title: String, iconAsset: String, iconSize: CGFloat) -> some View {
-        // Material drives the box; the icon+label are overlaid dead-center so they
-        // never drift with the content's own intrinsic size. Slightly taller than
-        // 16:9, and on the streak-disc material.
-        actionCardMaterial
+    private func actionCard(title: String, iconAsset: String, palette: LightSheet.Achievement.Palette, isPhone: Bool) -> some View {
+        let shape = RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
+        return shape
+            .fill(LinearGradient(colors: [palette.top, palette.bottom],
+                                 startPoint: .topLeading, endPoint: .bottomTrailing))
             .aspectRatio(16.0 / 10.5, contentMode: .fit)
             .overlay {
-                VStack(spacing: Theme.Spacing.xs) {
-                    Image(iconAsset)
-                        .resizable()
-                        .interpolation(.high)
-                        .scaledToFit()
-                        .frame(width: iconSize, height: iconSize)
-                        // Fixed-height slot keeps both labels at the same Y
-                        // regardless of each icon's visual size.
-                        .frame(height: actionIconSlot)
-                    // The CTA grade, not a tile title: these two are Home's
-                    // primary actions. 17 was a rung that existed nowhere else.
-                    Text(title)
-                        .font(SheetType.ctaFont)
-                        .foregroundStyle(.white)
+                GeometryReader { geometry in
+                    let size = geometry.size
+                    let artworkSide = size.height * (isPhone ? 1.276 : 1.3)
+                    let artworkCenter = CGPoint(x: size.width * 0.5,
+                                                y: size.height * 0.87 + Theme.Spacing.s)
+                    ZStack(alignment: .topLeading) {
+                        Image(isPhone ? "HomeScrollPattern" : "HomeQuestsPattern")
+                            .resizable()
+                            .interpolation(.high)
+                            .frame(width: size.width, height: size.height)
+                            .opacity(0.24)
+                            .accessibilityHidden(true)
+                        Image(iconAsset)
+                            .resizable()
+                            .interpolation(.high)
+                            .scaledToFit()
+                            .frame(width: artworkSide, height: artworkSide)
+                            .position(artworkCenter)
+                        StrokedNumber(
+                            text: title,
+                            font: Typography.displayUIFont(size: SheetType.title + Theme.Spacing.xs, weight: .bold),
+                            fill: .black, stroke: .white,
+                            outlineWidth: (SheetType.title + Theme.Spacing.xs) * StrokedNumeral.outlineRatio)
+                        .fixedSize()
+                        .shadow(color: .black.opacity(LightSheet.Achievement.numeralShadowOpacity),
+                                radius: LightSheet.Achievement.numeralShadowRadius,
+                                y: LightSheet.Achievement.numeralShadowDrop)
+                        .frame(width: size.width, alignment: .center)
+                        .padding(.top, Theme.Spacing.s - 2 / displayScale)
+                    }
                 }
             }
+            .clipShape(shape)
+            .overlay {
+                shape.strokeBorder(
+                    LinearGradient(colors: [.white.opacity(0.6), .white.opacity(0.05)],
+                                   startPoint: .top, endPoint: .bottom), lineWidth: 1)
+            }
+            .illustratedCardShadow()
     }
+
 
 }
 

@@ -60,7 +60,8 @@ protocol ProofVerifier: AnyObject {
     func verify(image: UIImage, habit: Habit) async -> ProofVerdict
 }
 
-/// Always passes, after a beat.
+/// A deterministic verifier for development. It never grants a reward when no
+/// real verifier is configured; camera debug states provide explicit stand-ins.
 ///
 /// The beat is the point. Verification is the one moment in the app where the
 /// user waits on something, and a version that answers instantly would let the
@@ -78,7 +79,10 @@ final class MockProofVerifier: ProofVerifier {
                                 reason: "i genuinely can't tell what that is.",
                                 fix: "point it at your \(habit.name.lowercased()) and fill the frame, then try again.")
         }
-        return ProofVerdict(passed: true, reason: "looks like \(habit.name.lowercased()) to me.")
+        return ProofVerdict(passed: false,
+                            reason: "photo verification is unavailable right now.",
+                            fix: "try again when Aura can check your photo.",
+                            isFallback: true)
     }
 }
 

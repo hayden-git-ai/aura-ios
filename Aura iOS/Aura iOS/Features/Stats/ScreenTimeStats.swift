@@ -12,6 +12,7 @@ extension DeviceActivityReport.Context {
     /// The screen-time page of Stats. Declared on both sides — the app asks for
     /// it by name, the extension answers to it.
     static let screenTimeWeek = Self("screenTimeWeek")
+    static let hoursSaved = Self("hoursSaved")
 }
 
 /// The fixed window requested by the app and reconstructed by the report

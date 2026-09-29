@@ -57,6 +57,7 @@ struct AuraTimerLiveActivity: Widget {
                 }
             } compactLeading: {
                 Self.mascot(26, state: context.state)
+                    .padding(.leading, 3)
             } compactTrailing: {
                 Self.countdown(context.state)
                     .font(WidgetType.display(size: 16, weight: 700))

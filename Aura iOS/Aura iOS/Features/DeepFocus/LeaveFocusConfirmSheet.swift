@@ -20,15 +20,13 @@ struct LeaveFocusConfirmSheet: View {
             VStack(spacing: 0) {
                 LightDragCapsule()
 
-                // The fox with a STOP sign, plus the soft shadow the other fox
-                // illustrations carry. 120, not the sheets' usual ~96: this art
-                // shares its frame with the sign and fills less of its canvas, so
-                // a taller frame lands a fox that matches the others on screen.
-                Image("Lock In_End Session Sheet")
+                // Reuse the delete-action sticker rather than the copied
+                // end-session duplicate, and give it a full hero footprint.
+                Image("Lock In_End Session Sticker")
                     .resizable()
                     .interpolation(.high)
                     .scaledToFit()
-                    .frame(height: 120)
+                    .frame(height: 136)
                     .foxShadow()
                     .padding(.top, Theme.Spacing.xl)
                     // The art carries ~19pt of empty space below the fox's feet,

@@ -81,7 +81,7 @@ final class LiveScreenTimeService: ScreenTimeService {
                 return
             }
 
-            var selection = Self.decode(current.token) ?? FamilyActivitySelection()
+            let selection = Self.decode(current.token) ?? FamilyActivitySelection()
             var didFinish = false
 
             let finish: (FamilyActivitySelection?) -> Void = { result in
@@ -92,8 +92,8 @@ final class LiveScreenTimeService: ScreenTimeService {
             }
 
             let picker = FamilyActivityPickerHost(
-                selection: Binding(get: { selection }, set: { selection = $0 }),
-                onDone: { finish(selection) },
+                selection: selection,
+                onDone: { finish($0) },
                 onCancel: { finish(nil) }
             )
             let controller = UIHostingController(rootView: picker)
@@ -265,9 +265,17 @@ final class LiveScreenTimeService: ScreenTimeService {
 /// the same wrapper around it; this one is built out of Aura's, so the only
 /// part that looks like the system is the part the system draws.
 private struct FamilyActivityPickerHost: View {
-    @Binding var selection: FamilyActivitySelection
-    var onDone: () -> Void
+    @State private var selection: FamilyActivitySelection
+    var onDone: (FamilyActivitySelection) -> Void
     var onCancel: () -> Void
+
+    init(selection: FamilyActivitySelection,
+         onDone: @escaping (FamilyActivitySelection) -> Void,
+         onCancel: @escaping () -> Void) {
+        _selection = State(initialValue: selection)
+        self.onDone = onDone
+        self.onCancel = onCancel
+    }
 
     private var count: Int {
         selection.applicationTokens.count
@@ -282,6 +290,7 @@ private struct FamilyActivityPickerHost: View {
             VStack(spacing: 0) {
                 LightSubSheetHeader(title: "Choose apps",
                                     subtitle: "Pick apps, whole categories, or websites.")
+                    .padding(.bottom, Theme.Spacing.m)
 
                 FamilyActivityPicker(selection: $selection)
 
@@ -291,7 +300,7 @@ private struct FamilyActivityPickerHost: View {
                         .foregroundStyle(LightSheet.subtitle)
 
                     LightPrimaryButton(title: "Save", enabled: count > 0) {
-                        onDone()
+                        onDone(selection)
                     }
 
                     Button("Cancel", action: onCancel)

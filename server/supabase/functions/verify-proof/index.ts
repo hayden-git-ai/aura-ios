@@ -47,16 +47,8 @@ interface Verdict {
   /**
    * Google refused to look at the photo.
    *
-   * A separate outcome from a fail, and it has to be, because of how the app
-   * handles errors. Every non-200 becomes a fallback verdict, and a fallback
-   * verdict PAYS OUT: somebody standing there having genuinely done the habit
-   * shouldn't lose their reward to our outage. That is right for an outage and
-   * exactly wrong here. A safety block is the one case where the model
-   * definitely did look and definitely refused, and letting it fall through the
-   * error path meant the app rewarded it.
-   *
-   * So it comes back 200, as an honest `passed: false`, flagged. The app shows
-   * neutral copy for it rather than the fox.
+   * Safety refusal is distinct from unavailable verification. Both reject the
+   * photo, but this flag lets the app show neutral blocked-content guidance.
    */
   blocked?: boolean;
 }
@@ -71,13 +63,9 @@ Deno.serve(async (request: Request): Promise<Response> => {
   // the moment the secret is set. No App Store release, no redeploy: it is read
   // fresh on each request.
   //
-  // Returns a fail-open pass, which is the same outcome the app already falls
-  // back to when it can't reach this endpoint, so users keep earning while the
-  // switch is on. That is the right trade for a cost incident: stop paying
-  // Google, don't strand the person standing there having done the habit. To
-  // freeze earning instead during an incident, return `passed: false` here.
+  // Unavailable verification never awards a pass or coins.
   if (isDisabled()) {
-    return json({ passed: true, reason: "", fix: "" }, 200);
+    return json({ error: "photo verification temporarily unavailable" }, 503);
   }
 
   // Two ways in, checked strongest first.
@@ -137,6 +125,19 @@ Deno.serve(async (request: Request): Promise<Response> => {
   // that isn't coming from our app.
   if (image.length > 400_000) {
     return json({ error: "image too large" }, 413);
+  }
+  // The client sends JPEG only. Reject arbitrary base64 before a permissive
+  // model can judge it, so blank or malformed payloads never earn a pass.
+  let imageBytes: Uint8Array;
+  try {
+    imageBytes = Uint8Array.from(atob(image), (char) => char.charCodeAt(0));
+  } catch {
+    return json({ error: "image is not valid base64" }, 400);
+  }
+  if (imageBytes.length < 4 || imageBytes[0] !== 0xff || imageBytes[1] !== 0xd8
+      || imageBytes[imageBytes.length - 2] !== 0xff
+      || imageBytes[imageBytes.length - 1] !== 0xd9) {
+    return json({ error: "image must be a JPEG" }, 415);
   }
 
   try {
@@ -297,7 +298,10 @@ async function judge(
   }
 
   const parsed = JSON.parse(text) as Verdict;
-  const passed = Boolean(parsed.passed);
+  if (typeof parsed.passed !== "boolean") {
+    throw new Error("invalid passed field");
+  }
+  const passed = parsed.passed;
   return {
     passed,
     reason: String(parsed.reason ?? "").slice(0, 140),
@@ -381,7 +385,10 @@ async function judgeFallback(
   }
 
   const parsed = JSON.parse(text) as Verdict;
-  const passed = Boolean(parsed.passed);
+  if (typeof parsed.passed !== "boolean") {
+    throw new Error("invalid passed field");
+  }
+  const passed = parsed.passed;
   return {
     passed,
     reason: String(parsed.reason ?? "").slice(0, 140),
@@ -414,7 +421,8 @@ function prompt(habitName: string, hint: string): string {
     "Fail only if:",
     "- the photo has nothing to do with the habit",
     "- it is a photo of a screen, a screenshot, or an image of an image",
-    "- it is too dark or blurred to tell what it shows",
+    "- it is black, blank, too dark or blurred to tell what it shows",
+    "- it shows only a small or unrelated part of the scene, with no credible evidence of the habit",
     "",
     "Both fields are spoken by Aura, a dry, warm fox talking to the user like a friend.",
     "Write in Aura's voice: all lowercase, casual and spoken, a little dry, never corporate.",

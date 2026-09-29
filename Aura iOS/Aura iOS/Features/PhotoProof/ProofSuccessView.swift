@@ -72,7 +72,7 @@ struct ProofSuccessView: View {
                              value: "\(store.timesDone(habit))", label: "Times done")
                 EarnStatTile(icon: { EarnTileIcon(asset: "EarnCardIcon") },
                              value: "+\(payout)", label: "Coins earned")
-                EarnStatTile(icon: { EarnTileIcon(asset: "StreakFireIcon") },
+                EarnStatTile(icon: { EarnTileIcon(asset: "StreakFlame") },
                              value: "\(store.streak.currentStreak)", label: "Day streak")
             }
             .fixedSize(horizontal: false, vertical: true)

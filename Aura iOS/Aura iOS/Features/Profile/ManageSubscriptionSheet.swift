@@ -77,6 +77,7 @@ struct ManageSubscriptionSheet: View {
     private func card<C: View>(@ViewBuilder _ content: () -> C) -> some View {
         VStack(spacing: 0) { content() }
             .padding(.horizontal, Theme.Spacing.l)
+            .frame(maxWidth: .infinity)
             .bottomDropCard(radius: Theme.Radius.card)
     }
 
@@ -86,7 +87,7 @@ struct ManageSubscriptionSheet: View {
             .resizable()
             .interpolation(.high)
             .scaledToFit()
-            .frame(width: 34, height: 34)
+            .frame(width: 38, height: 38)
     }
 
     // MARK: - 1. Overview
@@ -117,12 +118,14 @@ struct ManageSubscriptionSheet: View {
                         }
                         .padding(.vertical, Theme.Spacing.l)
 
-                        // The account this plan is tied to, so it's clear whose
-                        // subscription this is. Shown only when we have an identity.
-                        if !accountLabel.isEmpty {
-                            Divider().overlay(LightSheet.divider)
+                    }
+                }
+                if !accountLabel.isEmpty {
+                    VStack(alignment: .leading, spacing: Theme.Spacing.s) {
+                        sectionHeader("Account")
+                        card {
                             HStack(spacing: Theme.Spacing.m) {
-                                rowIcon("FoxSettingsProfile")
+                                rowIcon("SettingsName")
                                 Text("Account")
                                     .auraFont(.body, RowType.label, .semibold)
                                     .foregroundStyle(RowType.labelColor)
@@ -134,7 +137,6 @@ struct ManageSubscriptionSheet: View {
                                     .truncationMode(.middle)
                             }
                             .padding(.vertical, Theme.Spacing.l)
-                            // Keep the account email out of session replays.
                             .maskedInReplays()
                         }
                     }
@@ -212,7 +214,7 @@ struct ManageSubscriptionSheet: View {
                     .resizable()
                     .interpolation(.high)
                     .scaledToFit()
-                    .frame(width: 34, height: 34)
+                    .frame(width: 38, height: 38)
                     .rotationEffect(.degrees(picked ? -15 : 0))
                 Text(option.label)
                     .auraFont(.body, RowType.label, .medium)

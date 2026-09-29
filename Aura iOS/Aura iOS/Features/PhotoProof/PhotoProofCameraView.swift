@@ -38,12 +38,15 @@ struct PhotoProofCameraView: View {
     var onPassed: (ProofVerdict, UIImage?) -> Void
 
     @Environment(HabitStore.self) private var store
+    @Environment(\.openURL) private var openURL
     @StateObject private var controller = PhotoCaptureController()
     @State private var hasAISharingConsent = false
     @State private var frozen: UIImage?
     @State private var verdict: ProofVerdict?
     @State private var showHelp = false
     @State private var showAISharingConsent = false
+    @State private var waitingForPrivacyReturn = false
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         ZStack {
@@ -127,6 +130,11 @@ struct PhotoProofCameraView: View {
             }
         }
         .onDisappear { controller.stop() }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active, waitingForPrivacyReturn else { return }
+            waitingForPrivacyReturn = false
+            showAISharingConsent = true
+        }
         .onChange(of: controller.capturedImage) { _, image in
             guard let image, frozen == nil else { return }
             beginVerification(image)
@@ -142,6 +150,19 @@ struct PhotoProofCameraView: View {
         }
         .alert("Allow AI photo verification?", isPresented: $showAISharingConsent) {
             Button("Not now", role: .cancel) { onClose() }
+            Button("Privacy policy") {
+                waitingForPrivacyReturn = true
+                openURL(AuraLink.privacy) { _ in
+                    // Some URL handlers stay in this scene. Let the alert
+                    // finish dismissing, then restore the explicit choice.
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .milliseconds(350))
+                        guard scenePhase == .active, waitingForPrivacyReturn else { return }
+                        waitingForPrivacyReturn = false
+                        showAISharingConsent = true
+                    }
+                }
+            }
             Button("Allow and continue") {
                 PhotoProofAIConsent.grant(for: SupabaseManager.shared.currentUserID)
                 hasAISharingConsent = true
@@ -153,7 +174,9 @@ struct PhotoProofCameraView: View {
     }
 
     private func beginVerification(_ image: UIImage) {
-        guard hasAISharingConsent else {
+        guard hasAISharingConsent,
+              PhotoProofAIConsent.isGranted(for: SupabaseManager.shared.currentUserID) else {
+            hasAISharingConsent = false
             controller.capturedImage = nil
             controller.stop()
             showAISharingConsent = true
@@ -260,13 +283,17 @@ struct PhotoProofCameraView: View {
     /// to go there. Dimming the outside does the work the brackets were only
     /// gesturing at.
     private func scrim(around rect: CGRect) -> some View {
-        Color.black.opacity(0.35)
+        // The brackets are a 5pt centred stroke, so their visible edge sits
+        // 2.5pt outside the preference's path bounds. Grow the cutout by that
+        // same half-line-width so the opening follows the brackets exactly.
+        let halfStroke: CGFloat = 2.5
+        let opening = rect.insetBy(dx: -halfStroke, dy: -halfStroke)
+        return Color.black.opacity(0.35)
             .reverseMask {
                 RoundedRectangle(cornerRadius: ViewfinderFrame.radius, style: .continuous)
-                    .frame(width: rect.width, height: rect.height)
-                    .position(x: rect.midX, y: rect.midY)
+                    .frame(width: opening.width, height: opening.height)
+                    .position(x: opening.midX, y: opening.midY)
             }
-            .ignoresSafeArea()
             .allowsHitTesting(false)
     }
 
@@ -283,12 +310,13 @@ struct PhotoProofCameraView: View {
                 CircleIconButton(symbol: "chevron.left",
                                  fill: LightSheet.chromeOnPhoto,
                                  glyphColor: .white,
-                                 action: onClose)
+                                 action: {
+                                     onClose()
+                                 })
                     .photoHalo()
                 Spacer()
                 CircleIconButton(sticker: "FoxSettingsHelp",
                                  fill: LightSheet.chromeOnPhoto) {
-                    Haptics.impact(.light)
                     showHelp = true
                 }
                 .photoHalo()
@@ -336,7 +364,10 @@ struct PhotoProofCameraView: View {
 
     private var bottomControls: some View {
         ZStack {
-            Button { controller.capture() } label: {
+            Button {
+                Haptics.impact(.light)
+                controller.capture()
+            } label: {
                 Circle()
                     .fill(.white)
                     .frame(width: 72, height: 72)
@@ -346,7 +377,7 @@ struct PhotoProofCameraView: View {
                     // control wears says the same thing and says it once.
                     .photoHalo(diameter: 72)
             }
-            .buttonStyle(PressBounceStyle())
+            .buttonStyle(PressBounceStyle(hapticsEnabled: false))
 
             HStack {
                 // `stepper`, the 44pt grade, rather than the hand-rolled 52
@@ -373,7 +404,7 @@ enum PhotoProofAIConsent {
     // so existing users receive the revised disclosure before another upload.
     private static let storageKey = "aura.photoProof.aiSharingConsent.v1"
 
-    static let disclosure = "To verify this habit, Aura will send your photo to Google Gemini. If Gemini fails, Aura may send it to OpenAI. Aura does not keep the verification copy. After a pass, Aura attempts to save the photo to your Wall of Wins and, when signed in, sync it to your private Aura storage."
+    static let disclosure = "Aura sends this photo to an AI service to check your habit. You choose whether to continue."
 
     static func isGranted(for userID: UUID?, defaults: UserDefaults = .standard) -> Bool {
         defaults.bool(forKey: scopedStorageKey(for: userID))

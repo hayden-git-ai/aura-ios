@@ -13,13 +13,9 @@ import SwiftUI
 /// is visible.
 struct Explainer {
     let title: String
-    /// Asset-catalog name for the hero above the steps.
-    ///
-    /// Every explainer shows the same fox holding a question mark. The art
-    /// answers "what is this sheet", not "what is this feature", and the title
-    /// underneath already says which feature. Six different mascots made six
-    /// sheets that do one job look like six unrelated places.
-    let hero: String
+    let subtitle: String
+    /// Blocking keeps its existing explainer art; Earn and camera sheets omit it.
+    var hero: String? = nil
     let accent: Color
     let steps: [StepsExplainerSheet.Step]
     var footnote: String? = nil
@@ -39,7 +35,7 @@ enum QuestExplainer {
 
     static let coins = Explainer(
         title: "How Aura Coins Work",
-        hero: "FoxHowItWorks",
+        subtitle: "Earn minutes for the apps you want back.",
         accent: LightSheet.blue,
         steps: [
             StepsExplainerSheet.Step(
@@ -62,6 +58,7 @@ enum QuestExplainer {
     /// single answer.
     static let blocking = Explainer(
         title: "How Blocking Works",
+        subtitle: "Aura keeps distracting apps behind a simple rule.",
         hero: "FoxHowItWorks",
         accent: LightSheet.blue,
         steps: [
@@ -82,8 +79,8 @@ enum QuestExplainer {
     )
 
     static let photoProof = Explainer(
-        title: "How Photo Proof Works",
-        hero: "FoxHowItWorks",
+        title: "How Healthy Habits Work",
+        subtitle: "Show Aura you started, then earn coins.",
         accent: HabitCategory.photoTask.accent,
         steps: [
             StepsExplainerSheet.Step(
@@ -102,8 +99,8 @@ enum QuestExplainer {
     )
 
     static let cameraReps = Explainer(
-        title: "How Camera Reps Work",
-        hero: "FoxHowItWorks",
+        title: "How Daily Exercises Work",
+        subtitle: "Move in front of your camera and earn as you go.",
         accent: HabitCategory.exercise.accent,
         steps: [
             StepsExplainerSheet.Step(
@@ -122,8 +119,8 @@ enum QuestExplainer {
     )
 
     static let lockIn = Explainer(
-        title: "How Lock In Works",
-        hero: "FoxHowItWorks",
+        title: "How Deep Focus Works",
+        subtitle: "Stay focused while Aura keeps your apps locked.",
         accent: HabitCategory.focus.accent,
         steps: [
             StepsExplainerSheet.Step(
@@ -143,7 +140,7 @@ enum QuestExplainer {
 
     static let passiveIncome = Explainer(
         title: "How Passive Income Works",
-        hero: "FoxHowItWorks",
+        subtitle: "Your everyday activity can earn coins too.",
         accent: HabitCategory.healthSync.accent,
         steps: [
             StepsExplainerSheet.Step(
@@ -190,11 +187,10 @@ struct ExplainerButton: View {
                          fill: discFill ?? (onBlue ? LightSheet.chromeOnBlue
                              : onDark ? LightSheet.chromeOnCamera : LightSheet.chromeOnLight),
                          bounces: false) {
-            Haptics.impact(.light)
             showing = true
         }
         .sheet(isPresented: $showing) {
-            StepsExplainerSheet(title: explainer.title, hero: explainer.hero,
+            StepsExplainerSheet(title: explainer.title, subtitle: explainer.subtitle, hero: explainer.hero,
                                 steps: explainer.steps, accent: explainer.accent,
                                 footnote: explainer.footnote,
                                 secondaryTitle: secondaryTitle,

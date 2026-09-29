@@ -45,17 +45,15 @@ struct DeepFocusConfig: Identifiable {
     /// timer counts up instead of down, and earns screen time by the minutes
     /// actually focused rather than a preset length.
     var isUntimed: Bool = false
-    /// Coins earned per hour focused — captured from the user's editable
-    /// `HabitStore.deepFocusRate` at commit time.
-    var earnRate: Double = 10
+    /// Legacy hourly field retained for active-session compatibility. Deep Focus
+    /// now awards exactly one coin per minute, regardless of this value.
+    var earnRate: Double = 60
 
-    /// The hourly rate prorated over the session, rounded to whole coins.
-    var earnedMinutes: Int { Int((Double(lengthMinutes) * earnRate / 60).rounded()) }
+    /// One coin per focused minute.
+    var earnedMinutes: Int { max(0, lengthMinutes) }
 
-    /// Coins for an untimed session, given the seconds actually focused.
-    func earnedMinutes(forElapsedSeconds seconds: Int) -> Int {
-        Int((Double(seconds) / 3600.0 * earnRate).rounded())
-    }
+    /// Coins for an untimed session, given the whole minutes actually focused.
+    func earnedMinutes(forElapsedSeconds seconds: Int) -> Int { max(0, seconds) / 60 }
 }
 
 /// Shared minutes → label formatting for anything showing a focus length —

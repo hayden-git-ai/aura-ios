@@ -11,6 +11,7 @@
 import AuthenticationServices
 import CryptoKit
 import SwiftUI
+import UIKit
 
 // MARK: - Sign in with Apple
 
@@ -58,6 +59,7 @@ final class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate,
         else {
             // No identity token means we can't open a Supabase session.
             onResult?(nil)
+            Haptics.notify(.error)
             finish()
             return
         }
@@ -77,6 +79,9 @@ final class AppleSignInCoordinator: NSObject, ASAuthorizationControllerDelegate,
     func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
         // Cancelled or failed: don't sign in, just stay on the screen.
         onResult?(nil)
+        if (error as? ASAuthorizationError)?.code != .canceled {
+            Haptics.notify(.error)
+        }
         finish()
     }
 
@@ -494,45 +499,26 @@ private struct TightHeroImage: View {
 
 // MARK: - Home-exact fox (setup fox screens)
 
-/// The setup fox screens' hero: the ORIGINAL celebration animation, but sized and
-/// grounded to match the Home screen's fox exactly — the Home fox's 260 frame and
-/// its contact shadow (same size AND position), so the fox and shadow read
-/// identically to Home.
+/// The setup completion keeps its celebration animation, but uses Home's 260pt
+/// hero frame and exact contact-shadow geometry/offsets.
 private struct SetupHomeFox: View {
     private static let size: CGFloat = 260
-    /// The bushy tail pulls the body left of centre; nudge it back (same ratio
-    /// SuccessCelebrationArt uses).
     private static let bodyCentreNudge: CGFloat = size * (0.5 - 0.477)
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            // Home's contact shadow: same size (260 ratios) and position (-13).
             Ellipse()
                 .fill(Color.black.opacity(HomeDaylight.isDay() ? 0.12 : 0.30))
-                .frame(width: 260 * 0.51, height: 260 * 0.136)
+                .frame(width: Self.size * 0.51, height: Self.size * 0.136)
                 .offset(y: -13)
 
-            // The celebration clip, at Home's 260 size, stood on the shadow.
             LoopingVideoView(resource: "SuccessCelebration")
                 .frame(width: Self.size, height: Self.size)
                 .offset(x: Self.bodyCentreNudge, y: -12)
         }
         .frame(width: Self.size, height: Self.size)
-    }
-}
-
-// MARK: - 1 · Welcome
-
-struct SetupWelcomeView: View {
-    @Environment(SetupFlow.self) private var flow
-    var body: some View {
-        SetupScreen(
-            showBack: false, typing: true, accent: LightSheet.blue, heroBottomInset: 13, foxFeetY: 442, heroBox: 260,
-            bg: .home,
-            hero: { SetupHomeFox() },
-            title: "You're in!", subtitle: "Let's get Aura set up for you. It'll take less than 60 seconds!",
-            bottom: { LightPrimaryButton(title: "Let's go!") { flow.advance() }.padding(.horizontal, Theme.Spacing.xl) }
-        )
+        .offset(x: 4)
+        .offset(y: -4)
     }
 }
 
@@ -578,19 +564,20 @@ struct SetupSignInView: View {
             LightSheet.bg.ignoresSafeArea()
 
             VStack(spacing: 0) {
-                SetupTopBar(showBack: true, accent: LightSheet.blue)
+                SetupTopBar(showBack: false, accent: LightSheet.blue)
 
-                // Title sits top-left under the bar (reference layout).
-                VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                VStack(alignment: .center, spacing: Theme.Spacing.xs) {
                     Text("Save your progress")
                         .auraFont(.display, SheetType.hero, .bold)
                         .foregroundStyle(SheetType.titleColor)
+                        .multilineTextAlignment(.center)
                     Text("Sign in so your streak and coins follow you everywhere.")
                         .auraFont(.body, SheetType.cardTitle, .regular)
                         .foregroundStyle(SheetType.subtitleColor)
+                        .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .center)
                 .padding(.horizontal, Theme.Spacing.xl)
                 .padding(.top, Theme.Spacing.l)
 
@@ -605,12 +592,15 @@ struct SetupSignInView: View {
                                     try await SupabaseManager.shared.signInWithApple(
                                         idToken: credential.idToken, nonce: credential.nonce)
                                     store.applySignIn(fullName: credential.fullName, email: credential.email)
+                                    flow.restorePendingOnboardingNameIfNeeded(in: store)
                                     try? await SupabaseManager.shared.upsertProfile(
-                                        displayName: credential.fullName, email: credential.email)
+                                        displayName: store.displayName, email: credential.email)
+                                    Haptics.notify(.success)
                                     await MainActor.run { flow.advance() }
                                 } catch {
                                     // Session couldn't be opened: stay on the screen.
                                     // A visible error surface comes with the email path.
+                                    Haptics.notify(.error)
                                 }
                             }
                         }
@@ -624,12 +614,17 @@ struct SetupSignInView: View {
                                     nonce: result.nonce)
                                 await MainActor.run {
                                     store.applySignIn(fullName: result.name, email: result.email)
+                                    flow.restorePendingOnboardingNameIfNeeded(in: store)
                                 }
                                 try? await SupabaseManager.shared.upsertProfile(
-                                    displayName: result.name, email: result.email)
+                                    displayName: store.displayName, email: result.email)
+                                Haptics.notify(.success)
                                 await MainActor.run { flow.advance() }
+                            } catch is CancellationError {
+                                return
                             } catch {
                                 // Cancelled or failed: stay on the screen.
+                                Haptics.notify(.error)
                             }
                         }
                     }
@@ -641,7 +636,7 @@ struct SetupSignInView: View {
                     HStack(spacing: 4) {
                         Text("Would you like to sign in later?")
                             .auraFont(.body, SheetType.cardTitle, .medium).foregroundStyle(SheetType.subtitleColor)
-                        Button("Skip") { flow.advance() }
+                        Button("Skip") { Haptics.impact(.light); flow.advance() }
                             .auraFont(.body, SheetType.cardTitle, .bold).foregroundStyle(SheetType.titleColor)
                             .underline().buttonStyle(.plain)
                     }
@@ -654,6 +649,11 @@ struct SetupSignInView: View {
         .fullScreenCover(isPresented: $showEmailSignIn) {
             SetupEmailSignInView(onSignedIn: {
                 showEmailSignIn = false
+                flow.restorePendingOnboardingNameIfNeeded(in: store)
+                Task {
+                    try? await SupabaseManager.shared.upsertProfile(
+                        displayName: store.displayName, email: store.email)
+                }
                 flow.advance()
             })
         }
@@ -685,7 +685,7 @@ struct SetupSignInView: View {
 
 /// Email + password sign-in, for people who joined through the web funnel, where
 /// the account was created with an email and password. Presented full-screen over
-/// the sign-in screen, in the same purple world. On success it dismisses and the
+/// the sign-in screen, using the same light surface. On success it dismisses and the
 /// flow advances, exactly like Apple.
 struct SetupEmailSignInView: View {
     @Environment(HabitStore.self) private var store
@@ -826,9 +826,10 @@ struct SetupEmailSignInView: View {
                 store.applySignIn(fullName: profile?.displayName, email: profile?.email ?? cleanEmail)
                 isSubmitting = false
                 onSignedIn()
-            } catch {
-                isSubmitting = false
-                errorText = "That email and password didn't match. Give it another go."
+                } catch {
+                    isSubmitting = false
+                    errorText = "That email and password didn't match. Give it another go."
+                    Haptics.notify(.error)
             }
         }
     }
@@ -841,8 +842,14 @@ struct SetupEmailSignInView: View {
         }
         errorText = nil
         Task {
-            try? await SupabaseManager.shared.sendPasswordReset(to: cleanEmail)
-            noticeText = "Check your email for a link to reset your password."
+            do {
+                try await SupabaseManager.shared.sendPasswordReset(to: cleanEmail)
+                noticeText = "Check your email for a link to reset your password."
+                Haptics.notify(.success)
+            } catch {
+                errorText = "Aura couldn't send that reset email. Try again in a moment."
+                Haptics.notify(.error)
+            }
         }
     }
 }
@@ -899,10 +906,27 @@ struct SetupScreenTimeView: View {
                 VStack(spacing: Theme.Spacing.m) {
                     privacyCard
                     LightPrimaryButton(title: "Connect to Screen Time") { Task { await flow.requestScreenTime() } }
+                    if flow.screenTimeStatus == .denied || flow.screenTimeStatus == .restricted {
+                        Text(recoveryMessage)
+                            .auraFont(.body, SheetType.subtitle, .regular)
+                            .foregroundStyle(LightSheet.danger)
+                            .multilineTextAlignment(.center)
+                        setupTextButton("Open Settings", color: LightSheet.title) {
+                            if let url = URL(string: UIApplication.openSettingsURLString) {
+                                UIApplication.shared.open(url)
+                            }
+                        }
+                    }
                 }
                 .padding(.horizontal, Theme.Spacing.xl)
             }
         )
+    }
+    private var recoveryMessage: String {
+        if flow.screenTimeStatus == .restricted {
+            return "Screen Time access isn't available on this device. Check the device's restrictions and try again."
+        }
+        return "Screen Time access is off. Allow it in Settings to choose apps."
     }
     private var iconPair: some View {
         HStack(spacing: -20) {
@@ -1003,7 +1027,7 @@ struct SetupAllSetView: View {
             showBack: false, typing: true, accent: LightSheet.blue, heroBottomInset: 13, foxFeetY: 442, heroBox: 260,
             bg: .home,
             hero: { SetupHomeFox() },
-            title: "You're all set!", subtitle: "Now let me show you around the app.",
+            title: "You're all set!", subtitle: "Now go log your first habit to earn coins.",
             bottom: { LightPrimaryButton(title: "Let's go!") { flow.advance() }.padding(.horizontal, Theme.Spacing.xl) }
         )
     }
@@ -1025,19 +1049,18 @@ struct AccountSignInSheet: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            SunburstBackground(lighter: SetupPalette.purpleL, darker: SetupPalette.purpleD, centre: 0.24)
-                .ignoresSafeArea()
+            LightSheet.bg.ignoresSafeArea()
 
             VStack(spacing: 0) {
                 header
                 Spacer(minLength: 0)
                 SetupStreakHero()
                 setupTitle("Save your progress",
-                           "Sign in so your streak and coins follow you everywhere, and so you can message the founders.",
+                           "Sign in so your streak and coins follow you everywhere.",
                            onDark: false)
                     .padding(.horizontal, Theme.Spacing.xl)
                     .padding(.top, Theme.Spacing.m)
-                    .padding(.bottom, Theme.Spacing.l)
+                    .padding(.bottom, Theme.Spacing.xxl)
                 buttons
                     .padding(.horizontal, Theme.Spacing.xl)
                     .padding(.bottom, Theme.Spacing.xxl)
@@ -1055,11 +1078,9 @@ struct AccountSignInSheet: View {
         HStack {
             Spacer()
             Button { dismiss() } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(LightSheet.title)
-                    .frame(width: 36, height: 36)
-                    .background(Circle().fill(.white.opacity(0.65)))
+                WoodButtonArtwork(role: .close)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Circle())
             }
         }
         .padding(.horizontal, Theme.Spacing.l)
@@ -1080,9 +1101,13 @@ struct AccountSignInSheet: View {
                             }
                             try? await SupabaseManager.shared.upsertProfile(
                                 displayName: credential.fullName, email: credential.email)
+                            Haptics.notify(.success)
                             await MainActor.run { finish() }
+                        } catch is CancellationError {
+                            return
                         } catch {
                             // Stay put on failure; the caller can retry.
+                            Haptics.notify(.error)
                         }
                     }
                 }
@@ -1099,9 +1124,13 @@ struct AccountSignInSheet: View {
                         }
                         try? await SupabaseManager.shared.upsertProfile(
                             displayName: result.name, email: result.email)
+                        Haptics.notify(.success)
                         await MainActor.run { finish() }
+                    } catch is CancellationError {
+                        return
                     } catch {
                         // Stay put on failure; the caller can retry.
+                        Haptics.notify(.error)
                     }
                 }
             }

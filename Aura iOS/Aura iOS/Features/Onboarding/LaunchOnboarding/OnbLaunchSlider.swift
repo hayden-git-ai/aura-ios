@@ -45,16 +45,11 @@ struct OnbLaunchSlider: View {
         @Bindable var flow = flow
         return OnbLaunchQuestionLayout(
             progress: flow.progress,
-            headerText: reacting ? reactionLine : "how much time do you spend on your phone every day? not judging.",
-            onFinishedTyping: {
-                if reacting {
-                    Task { try? await Task.sleep(nanoseconds: 1_500_000_000); finish() }
-                }
-            },
+            question: reacting ? reactionLine : "How much time do you spend on your phone every day?",
             content: {
                 VStack(spacing: Theme.Spacing.xxl) {
                     Text(flow.hours >= 12 ? "12+ hours" : "\(flow.hoursText) hours")
-                        .auraFont(.display, 44, .heavy)
+                        .auraFont(.body, 44, .heavy)
                         .foregroundStyle(.white)
                         .monospacedDigit()
                         .contentTransition(.numericText())
@@ -75,7 +70,7 @@ struct OnbLaunchSlider: View {
                 .padding(.top, Theme.Spacing.xxl)
             },
             bottom: {
-                onbContinue {
+                onbLaunchContinue {
                     if !reacting { withAnimation(.easeInOut(duration: 0.25)) { reacting = true } }
                     else { finish() }
                 }

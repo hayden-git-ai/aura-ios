@@ -32,11 +32,6 @@ struct OnbLaunchCustomPlan: View {
                 LazyVStack(spacing: 0) {
                     heroBand
                     arcBand
-                    twoPathsBand
-                    #if DEBUG
-                    reviewsBand
-                    #endif
-                    faqBand
                     // Clearance so the last card scrolls clear of the floating button.
                     Spacer().frame(height: Self.buttonClearance)
                 }
@@ -63,7 +58,8 @@ struct OnbLaunchCustomPlan: View {
     // MARK: - A. Hero
 
     private var heroBand: some View {
-        let foxH: CGFloat = 200
+        let foxH: CGFloat = 192
+        let successArtNativeSize: CGFloat = 248
         let topSpace: CGFloat = 96          // clears the status bar / Dynamic Island
         let crestY = topSpace + foxH / 2    // hill line + beam origin at the fox's center
 
@@ -72,14 +68,10 @@ struct OnbLaunchCustomPlan: View {
         return VStack(spacing: 0) {
             Spacer().frame(height: topSpace)
 
-            LoopingVideoView(resource: "InterventionTalkFox")
-                .frame(height: foxH)
+            SuccessCelebrationArt()
+                .scaleEffect(foxH / successArtNativeSize)
+                .frame(width: foxH, height: foxH)
                 .frame(maxWidth: .infinity)
-                .background(alignment: .bottom) {
-                    Ellipse().fill(Color.black.opacity(0.13))
-                        .frame(width: foxH * 0.51, height: foxH * 0.136)
-                        .offset(y: -foxH * 0.05)
-                }
 
             Spacer().frame(height: Theme.Spacing.l)
 
@@ -106,7 +98,7 @@ struct OnbLaunchCustomPlan: View {
                 .padding(.top, 2)
 
             Text(planDate)
-                .auraFont(.display, SheetType.cta, .heavy)
+                .auraFont(.body, SheetType.cta, .heavy)
                 .foregroundStyle(LightSheet.blue)
                 .padding(.horizontal, Theme.Spacing.l)
                 .padding(.vertical, Theme.Spacing.s)
@@ -202,10 +194,12 @@ struct OnbLaunchCustomPlan: View {
         .background(LightSheet.blue)
     }
 
-    // The section header the reviews + FAQ bands share, matching the two-paths
-    // beat: the animated fox, then a centered white title.
+    // The section header the reviews + FAQ bands share.
     private func sectionFox() -> some View {
-        LoopingVideoView(resource: "InterventionTalkFox")
+        Image("FoxHowItWorks")
+            .resizable()
+            .interpolation(.high)
+            .scaledToFit()
             .frame(height: 200)
             .frame(maxWidth: .infinity)
             .background(alignment: .bottom) {
@@ -305,7 +299,6 @@ private struct OnbWeekCard: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: Theme.Spacing.m) {
-            // A per-week emoji over "Week N".
             VStack(spacing: Theme.Spacing.xs) {
                 Text(emoji)
                     .font(.system(size: 40))
@@ -404,8 +397,10 @@ private struct OnbTwoPaths: View {
     var body: some View {
         VStack(spacing: Theme.Spacing.xxxl) {
             VStack(spacing: 0) {
-                // Mascot: the same animated fox and size as the other sections.
-                LoopingVideoView(resource: "InterventionTalkFox")
+                Image("FoxLockInHero")
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFit()
                     .frame(height: 200)
                     .frame(maxWidth: .infinity)
                     .background(alignment: .bottom) {
@@ -596,7 +591,7 @@ private struct OnbReviewCard: View {
     var body: some View {
         VStack(spacing: Theme.Spacing.s) {
             Text(name)
-                .auraFont(.display, SheetType.cardTitle, .bold)
+                .auraFont(.body, SheetType.cardTitle, .bold)
                 .foregroundStyle(LightSheet.title)
             Text(quote)
                 .auraFont(.body, SheetType.cardTitle, .medium)

@@ -27,6 +27,8 @@ struct ExerciseFlowRoot: View {
 
     @State private var stage: Stage = .select
     @State private var didApplyStart = false
+    @State private var didFinish = false
+    @State private var didClaim = false
 
     var body: some View {
         Group {
@@ -45,11 +47,14 @@ struct ExerciseFlowRoot: View {
                     exercise: exercise,
                     onClose: { dismiss() },
                     onFinish: { reps, earnedMinutes in
+                        guard !didFinish else { return }
+                        didFinish = true
                         // Nothing earned means nothing to celebrate. Finishing a
                         // set short of the threshold is a real thing to do and
                         // it shouldn't be met with a party.
                         guard earnedMinutes > 0 else {
                             store.addExerciseSession(earnedMinutes: 0, reps: reps)
+                            Haptics.notify(.error)
                             dismiss()
                             return
                         }
@@ -63,6 +68,8 @@ struct ExerciseFlowRoot: View {
                 )
             case .success(let exercise, let reps, let earned):
                 ExerciseSuccessView(exercise: exercise, reps: reps, coins: earned) {
+                    guard !didClaim else { return }
+                    didClaim = true
                     store.addExerciseSession(earnedMinutes: earned, reps: reps)
                     if store.completeHabitToday() {
                         withAnimation(.easeInOut(duration: 0.25)) { stage = .streak }

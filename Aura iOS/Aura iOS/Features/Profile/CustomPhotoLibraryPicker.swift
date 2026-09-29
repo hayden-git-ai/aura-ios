@@ -4,6 +4,7 @@
 //
 
 import Photos
+import PhotosUI
 import SwiftUI
 import UIKit
 
@@ -14,11 +15,13 @@ import UIKit
 struct CustomPhotoLibraryPicker: View {
     var onImage: (UIImage) -> Void
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var assets: [PHAsset] = []
     @State private var status: PHAuthorizationStatus = .notDetermined
     @State private var selectedID: String?
     @State private var selectedImage: UIImage?
+    @State private var selectionRevision = 0
 
     // Crop transform for the preview.
     @State private var scale: CGFloat = 1
@@ -38,7 +41,7 @@ struct CustomPhotoLibraryPicker: View {
     /// The crop ring's inset and the selection ring's stroke.
     private static let cropRingInset: CGFloat = 6
     private static let selectionStroke: CGFloat = 3
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: gridGap), count: 3)
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: gridGap), count: 4)
 
     var body: some View {
         GeometryReader { geo in
@@ -51,9 +54,18 @@ struct CustomPhotoLibraryPicker: View {
                     if status == .denied || status == .restricted {
                         deniedState
                     } else {
-                        cropArea
-                        recentsHeader
-                        grid
+                        ScrollViewReader { proxy in
+                            ScrollView(showsIndicators: false) {
+                                cropArea.id("crop")
+                                recentsHeader
+                                grid
+                            }
+                            .onChange(of: selectionRevision) { _, _ in
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    proxy.scrollTo("crop", anchor: .top)
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -63,6 +75,9 @@ struct CustomPhotoLibraryPicker: View {
             .onChange(of: geo.size.width) { _, w in cropSide = w }
         }
         .onAppear(perform: load)
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { load() }
+        }
     }
 
     // MARK: - Header
@@ -74,16 +89,12 @@ struct CustomPhotoLibraryPicker: View {
                 .foregroundStyle(SheetType.titleColor)
 
             HStack {
-                Button { dismiss() } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(SheetType.titleColor)
-                        .frame(width: 40, height: 40)
-                        .background(LightSheet.chromeOnLight, in: Circle())
+                Button { Haptics.impact(.light); dismiss() } label: {
+                    WoodButtonArtwork(role: .close)
                         .frame(width: 44, height: 44)
                         .contentShape(Circle())
                 }
-                .buttonStyle(PressBounceStyle())
+                .buttonStyle(PressBounceStyle(hapticsEnabled: false))
 
                 Spacer()
 
@@ -116,8 +127,8 @@ struct CustomPhotoLibraryPicker: View {
             .overlay {
                 // Dim outside the circle + a hairline ring, so it reads as a
                 // circular crop the way the avatar will.
-                Rectangle()
-                    .fill(LightSheet.bg.opacity(0.55))
+                    Rectangle()
+                    .fill(Color.black.opacity(0.62))
                     .reverseMask { Circle().padding(Self.cropRingInset) }
                     .overlay { Circle().strokeBorder(.white.opacity(0.9), lineWidth: 2).padding(Self.cropRingInset) }
                     .allowsHitTesting(false)
@@ -127,15 +138,22 @@ struct CustomPhotoLibraryPicker: View {
             .gesture(
                 DragGesture()
                     .onChanged { g in
-                        offset = CGSize(width: lastOffset.width + g.translation.width,
-                                        height: lastOffset.height + g.translation.height)
+                        offset = boundedOffset(CGSize(width: lastOffset.width + g.translation.width,
+                                                      height: lastOffset.height + g.translation.height))
                     }
-                    .onEnded { _ in lastOffset = offset }
+                    .onEnded { _ in lastOffset = boundedOffset(offset) }
             )
             .simultaneousGesture(
                 MagnificationGesture()
-                    .onChanged { value in scale = max(1, lastScale * value) }
-                    .onEnded { _ in lastScale = scale }
+                    .onChanged { value in
+                        scale = min(4, max(1, lastScale * value))
+                        offset = boundedOffset(offset)
+                    }
+                    .onEnded { _ in
+                        lastScale = scale
+                        lastOffset = boundedOffset(offset)
+                        offset = lastOffset
+                    }
             )
             .padding(.bottom, Theme.Spacing.m)
     }
@@ -148,7 +166,7 @@ struct CustomPhotoLibraryPicker: View {
             if let selectedImage {
                 Image(uiImage: selectedImage)
                     .resizable()
-                    .scaledToFill()
+                    .frame(width: fittedImageSize.width, height: fittedImageSize.height)
                     .scaleEffect(scale)
                     .offset(offset)
             }
@@ -157,39 +175,59 @@ struct CustomPhotoLibraryPicker: View {
         .clipped()
     }
 
+    private func boundedOffset(_ proposed: CGSize) -> CGSize {
+        let horizontal = max(0, (fittedImageSize.width * scale - cropSide) / 2)
+        let vertical = max(0, (fittedImageSize.height * scale - cropSide) / 2)
+        return CGSize(width: min(horizontal, max(-horizontal, proposed.width)),
+                      height: min(vertical, max(-vertical, proposed.height)))
+    }
+
+    private var fittedImageSize: CGSize {
+        guard let image = selectedImage, image.size.width > 0, image.size.height > 0 else {
+            return CGSize(width: cropSide, height: cropSide)
+        }
+        let fit = max(cropSide / image.size.width, cropSide / image.size.height)
+        return CGSize(width: image.size.width * fit, height: image.size.height * fit)
+    }
+
     // MARK: - Grid
 
     private var recentsHeader: some View {
-        Text("Recents")
-            .auraFont(.body, SheetType.cardTitle, .bold)
-            .foregroundStyle(SheetType.titleColor)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, Theme.Spacing.l)
-            .padding(.vertical, Theme.Spacing.s)
+        HStack {
+            Text("Recents")
+                .auraFont(.body, SheetType.cardTitle, .bold)
+                .foregroundStyle(SheetType.titleColor)
+            Spacer()
+            if status == .limited {
+                Button("Choose more") { Haptics.impact(.light); presentLimitedPicker() }
+                    .auraFont(.body, 14, .semibold)
+                    .foregroundStyle(LightSheet.blue)
+            }
+        }
+        .padding(.horizontal, Theme.Spacing.l)
+        .padding(.vertical, Theme.Spacing.s)
     }
 
     private var grid: some View {
-        ScrollView(showsIndicators: false) {
-            LazyVGrid(columns: columns, spacing: Self.gridGap) {
-                ForEach(assets, id: \.localIdentifier) { asset in
-                    Color.clear
-                        .aspectRatio(1, contentMode: .fit)
-                        .overlay { PhotoThumbnail(asset: asset) }
-                        .overlay {
-                            if asset.localIdentifier == selectedID {
-                                Rectangle().strokeBorder(LightSheet.blue, lineWidth: Self.selectionStroke)
-                            }
+        LazyVGrid(columns: columns, spacing: Self.gridGap) {
+            ForEach(assets, id: \.localIdentifier) { asset in
+                Color.clear
+                    .aspectRatio(1, contentMode: .fit)
+                    .overlay { PhotoThumbnail(asset: asset) }
+                    .overlay {
+                        if asset.localIdentifier == selectedID {
+                            Rectangle().strokeBorder(LightSheet.blue, lineWidth: Self.selectionStroke)
                         }
-                        .clipped()
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            Haptics.impact(.light)
-                            select(asset)
-                        }
-                }
+                    }
+                    .clipped()
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        Haptics.impact(.light)
+                        select(asset)
+                    }
             }
-            .padding(.horizontal, Self.gridGap)
         }
+        .padding(.horizontal, Self.gridGap)
     }
 
     private var deniedState: some View {
@@ -239,16 +277,35 @@ struct CustomPhotoLibraryPicker: View {
         let opts = PHFetchOptions()
         opts.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
         opts.predicate = NSPredicate(format: "mediaType == %d", PHAssetMediaType.image.rawValue)
-        opts.fetchLimit = 300
+        // Fetch metadata for the entire authorized library; the lazy grid loads
+        // thumbnails only as cells become visible.
         let result = PHAsset.fetchAssets(with: opts)
         var list: [PHAsset] = []
         result.enumerateObjects { asset, _, _ in list.append(asset) }
         assets = list
-        if let first = list.first { select(first) }   // land on the newest, framed
+        if !list.contains(where: { $0.localIdentifier == selectedID }) {
+            selectedID = nil
+            selectedImage = nil
+            if let first = list.first { select(first) }
+        }
+    }
+
+    private func presentLimitedPicker() {
+        guard let scene = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .first(where: { $0.activationState == .foregroundActive }),
+              let controller = scene.windows.first(where: { $0.isKeyWindow })?.rootViewController else { return }
+        var presenter = controller
+        while let presented = presenter.presentedViewController { presenter = presented }
+        PHPhotoLibrary.shared().presentLimitedLibraryPicker(from: presenter) { _ in
+            DispatchQueue.main.async { load() }
+        }
     }
 
     private func select(_ asset: PHAsset) {
         selectedID = asset.localIdentifier
+        selectedImage = nil
+        selectionRevision += 1
         scale = 1; lastScale = 1; offset = .zero; lastOffset = .zero
 
         let opts = PHImageRequestOptions()
@@ -257,17 +314,19 @@ struct CustomPhotoLibraryPicker: View {
         opts.resizeMode = .exact
         PHImageManager.default().requestImage(
             for: asset,
-            targetSize: CGSize(width: 1400, height: 1400),
+            targetSize: CGSize(width: max(900, cropSide * 3), height: max(900, cropSide * 3)),
             contentMode: .aspectFit,
             options: opts
         ) { image, info in
             let degraded = (info?[PHImageResultIsDegradedKey] as? Bool) ?? false
+            guard selectedID == asset.localIdentifier else { return }
             if let image, !degraded { selectedImage = image }
         }
     }
 
     @MainActor private func confirm() {
-        let renderer = ImageRenderer(content: cropContent)
+        let diameter = cropSide - Self.cropRingInset * 2
+        let renderer = ImageRenderer(content: cropContent.frame(width: diameter, height: diameter).clipped())
         renderer.scale = 3
         if let image = renderer.uiImage {
             Haptics.impact(.medium)

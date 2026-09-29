@@ -62,7 +62,7 @@ struct TrendBadge: View {
             } else {
                 VStack(alignment: .leading, spacing: 0) {
                     Text(amount)
-                        .auraFont(.display, 17, .bold)
+                        .auraFont(.body, 17, .bold)
                         .foregroundStyle(amountColor)
                     Text(caption)
                         .auraFont(.body, 11, .medium)

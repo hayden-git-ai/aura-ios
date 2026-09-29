@@ -180,6 +180,9 @@ final class HabitStore {
 
     private let accountDependencies: AccountDependencies
     private let runsRuntimeSideEffects: Bool
+    #if DEBUG
+    private var previewClockEnabled = false
+    #endif
     private var activeAccountID: UUID?
     private var accountRevision: UInt = 0
     private var hasLoadedAccountScope = false
@@ -266,7 +269,7 @@ final class HabitStore {
             lifetimeFocusMinutes: 0, baselineWeeklyScreenMinutes: nil, dailyCoinGoal: 100,
             deepFocusSessions: focus.map { .init(durationMinutes: $0.durationMinutes,
                                                   earnedMinutes: $0.earnedMinutes, date: $0.date) },
-            deepFocusRate: 10, exerciseGoals: [:], purchases: [], wins: [],
+            deepFocusRate: 60, exerciseGoals: [:], purchases: [], wins: [],
             runningTimers: RunningTimers(), libraryUpdatedAt: Date(timeIntervalSince1970: 0),
             powerUpDate: nil, claimedPowerUps: [])
     }
@@ -900,7 +903,9 @@ final class HabitStore {
             DeepFocusSession(durationMinutes: $0.durationMinutes,
                              earnedMinutes: $0.earnedMinutes, date: $0.date)
         }
-        deepFocusRate = snapshot.deepFocusRate
+        // Deep Focus has a fixed one-coin-per-minute policy. Normalize older
+        // snapshots (which stored an hourly 5...20 rate) as they load.
+        deepFocusRate = 60
         exerciseGoals = snapshot.exerciseGoals
         purchases = snapshot.purchases
         wins = snapshot.wins
@@ -998,7 +1003,7 @@ final class HabitStore {
         baselineWeeklyScreenMinutes = nil
         dailyCoinGoal = 100
         deepFocusSessions = []
-        deepFocusRate = 10
+        deepFocusRate = 60
         exerciseGoals = [:]
         purchases = []
         wins = []
@@ -1183,6 +1188,13 @@ final class HabitStore {
             dayRecords[index].coinsEarned = 0
             if runsRuntimeSideEffects { DayLogFile.save(dayRecords) }
         }
+    }
+
+    /// Keeps isolated visual previews on the same model clock without enabling OS services.
+    func startPreviewClock() {
+        guard !runsRuntimeSideEffects else { return }
+        previewClockEnabled = true
+        startTicking()
     }
 
     /// Debug only: clear any bought/earned screen time so a purchase can be
@@ -1490,7 +1502,7 @@ final class HabitStore {
     /// Any session that should hold the Distracting rule shut — a Lock In or a
     /// photo habit. Both are "I'm doing the thing", and neither is compatible
     /// with the apps being open.
-    private var isSessionRunning: Bool {
+    var isSessionRunning: Bool {
         activeHabitSession != nil || activeFocusSession != nil
     }
 
@@ -1601,6 +1613,7 @@ final class HabitStore {
     /// re-applying is the only fix a user can perform themselves.
     @discardableResult
     func refreshShield() async -> Bool {
+        guard runsRuntimeSideEffects else { return true }
         guard !isReapplyingBlocking else { return !lastBlockingFailed }
         isReapplyingBlocking = true
         lastBlockingFailed = false
@@ -1795,6 +1808,16 @@ final class HabitStore {
     #endif
     var displayName: String = (UserDefaults.standard.string(forKey: HabitStore.kDisplayName)) ?? HabitStore.defaultDisplayName {
         didSet { persistActiveAccount() }
+    }
+
+    var hasCompleteDisplayName: Bool { ProfileIdentity.isValidName(displayName) }
+
+    @discardableResult
+    func saveProfileName(firstName: String, lastName: String) -> Bool {
+        let name = ProfileIdentity.normalizedName("\(firstName) \(lastName)")
+        guard ProfileIdentity.isValidName(name) else { return false }
+        displayName = name
+        return !accountPersistenceFailed
     }
 
     /// The account email, from Sign in with Apple. Empty until signed in.
@@ -2408,7 +2431,7 @@ final class HabitStore {
         // Handed to the system as well as kept here. `tick` only runs while
         // Aura is alive, and someone force-quitting during bought time is
         // exactly the case that still has to end.
-        if let unlockEndsAt { screenTime.scheduleReshield(at: unlockEndsAt) }
+        if runsRuntimeSideEffects, let unlockEndsAt { screenTime.scheduleReshield(at: unlockEndsAt) }
         // The whole point of buying time is that the apps open. `lock` had its
         // matching re-apply; this side didn't, so the shield stayed up until
         // something else happened to refresh it.
@@ -2421,7 +2444,7 @@ final class HabitStore {
         unlockEndsAt = nil
         unlockStartedAt = nil
         // The app got there first, so the safety net isn't needed.
-        screenTime.cancelScheduledReshield()
+        if runsRuntimeSideEffects { screenTime.cancelScheduledReshield() }
         Task { await refreshShield() }
         stopTickingIfIdle()
         syncLiveActivity()
@@ -2461,11 +2484,16 @@ final class HabitStore {
         if unlockEndsAt != nil, secondsRemaining == 0 { lock() }
         // Cheap, and the only thing that notices a Live Activity that failed to
         // start or went away without the app being told.
-        LiveActivityController.heal()
+        if runsRuntimeSideEffects { LiveActivityController.heal() }
         stopTickingIfIdle()
     }
 
     private func startTicking() {
+        #if DEBUG
+        guard runsRuntimeSideEffects || previewClockEnabled else { return }
+        #else
+        guard runsRuntimeSideEffects else { return }
+        #endif
         guard ticker == nil else { return }
         now = .now
         ticker = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
@@ -2487,6 +2515,7 @@ final class HabitStore {
     /// session outranks bought time on Home, so it does on the Island too.
     private func syncLiveActivity() {
         saveRunningTimers()
+        guard runsRuntimeSideEffects else { return }
 
         // Lock In first: it's a full-screen mode, so nothing else can be the
         // thing the user is actually doing while it runs.
@@ -2527,7 +2556,10 @@ final class HabitStore {
     /// drops the progress bar. Ending is the user's call either way — the store
     /// holds the anchors and mirrors them, but the focus screen still owns what
     /// a finished session is worth.
-    func startFocusSession(lengthMinutes: Int, isUntimed: Bool, earnRate: Double) {
+    @discardableResult
+    func startFocusSession(lengthMinutes: Int, isUntimed: Bool, earnRate: Double) -> Bool {
+        guard !isSessionRunning, lengthMinutes > 0 else { return false }
+        focusSessionPayout = nil
         activeFocusSession = ActiveFocusSession(
             startedAt: .now,
             endsAt: isUntimed ? nil : Date.now.addingTimeInterval(TimeInterval(lengthMinutes * 60)),
@@ -2539,6 +2571,7 @@ final class HabitStore {
         startTicking()
         Task { await refreshShield() }
         syncLiveActivity()
+        return true
     }
 
     /// Stops a session and banks what it earned.
@@ -2661,11 +2694,12 @@ final class HabitStore {
         recordToday(coins: earnedMinutes, method: .focus)
     }
 
-    /// Coins earned per hour focused, on the same 5/10/15/20 scale as habits.
-    var deepFocusRate: Double = 10 { didSet { persistActiveAccount() } }
+    /// Compatibility value for persisted setup state. Deep Focus always earns
+    /// one coin per minute, represented as 60 coins per hour.
+    var deepFocusRate: Double = 60 { didSet { persistActiveAccount() } }
 
     func setDeepFocusRate(_ rate: Double) {
-        deepFocusRate = min(20, max(5, rate))
+        deepFocusRate = 60
     }
 
     // MARK: - Exercise
@@ -2706,16 +2740,74 @@ final class HabitStore {
         let id: UUID
         let minutes: Int
         let date: Date
+        /// Nil for older purchases, which already used the receipt handoff.
+        var awaitingActivation: Bool?
 
-        init(id: UUID = UUID(), minutes: Int, date: Date) {
+        init(id: UUID = UUID(), minutes: Int, date: Date, awaitingActivation: Bool? = nil) {
             self.id = id
             self.minutes = minutes
             self.date = date
+            self.awaitingActivation = awaitingActivation
         }
     }
 
     /// Newest first.
-    var purchases: [Purchase] = [] { didSet { persistActiveAccount() } }
+    private var committingPurchaseHandoff = false
+    var purchases: [Purchase] = [] {
+        didSet { if !committingPurchaseHandoff { persistActiveAccount() } }
+    }
+
+    var pendingScreenTimePurchase: Purchase? {
+        purchases.first { $0.awaitingActivation == true }
+    }
+
+    /// Payment and its recoverable handoff are written in one snapshot.
+    @discardableResult
+    func beginPendingScreenTimePurchase(minutes: Int) -> Bool {
+        guard hasLoadedAccountScope, !isApplyingAccountSnapshot,
+              pendingScreenTimePurchase == nil, minutes > 0, coinBalance >= minutes else { return false }
+        let previous = purchases
+        committingPurchaseHandoff = true
+        defer { committingPurchaseHandoff = false }
+        purchases.insert(Purchase(minutes: minutes, date: .now, awaitingActivation: true), at: 0)
+        guard persistActiveAccount() else {
+            purchases = previous
+            recoverySnapshots[accountScopeName] = currentAccountSnapshot()
+            return false
+        }
+        return true
+    }
+
+    /// Called after Home's timer reveal. Consuming the handoff and extending
+    /// the deadline share one atomic snapshot, so relaunch cannot repeat it.
+    @discardableResult
+    func activatePendingScreenTimePurchase(id: UUID) -> Bool {
+        guard hasLoadedAccountScope, !isApplyingAccountSnapshot,
+              let index = purchases.firstIndex(where: { $0.id == id && $0.awaitingActivation == true })
+        else { return false }
+        let previousPurchases = purchases
+        let previousStart = unlockStartedAt
+        let previousEnd = unlockEndsAt
+        now = .now
+        let duration = purchases[index].minutes * 60
+        committingPurchaseHandoff = true
+        defer { committingPurchaseHandoff = false }
+        if unlockEndsAt == nil { unlockStartedAt = now }
+        unlockEndsAt = max(now, unlockEndsAt ?? now).addingTimeInterval(TimeInterval(duration))
+        purchases[index].awaitingActivation = false
+        guard persistActiveAccount() else {
+            purchases = previousPurchases
+            unlockStartedAt = previousStart
+            unlockEndsAt = previousEnd
+            recoverySnapshots[accountScopeName] = currentAccountSnapshot()
+            return false
+        }
+        if runsRuntimeSideEffects, let end = unlockEndsAt { screenTime.scheduleReshield(at: end) }
+        Task { await refreshShield() }
+        startTicking()
+        syncLiveActivity()
+        return true
+    }
 
     // MARK: - Wall of wins
 
@@ -2806,13 +2898,11 @@ final class HabitStore {
         unlock(seconds: minutes * 60)
     }
 
-    /// Banks earned minutes and unlocks the phone for that long (adding to any
-    /// time already remaining). The one grant path every earn mechanic uses.
+    /// Credits spendable coins. Only an explicit purchase starts screen time.
     func grantScreenTime(minutes: Int, method: HabitCategory? = nil) {
         guard minutes > 0 else { return }
         lifetimeEarnedMinutes += minutes
         recordToday(coins: minutes, method: method)
-        unlock(seconds: minutes * 60)
     }
 
     // MARK: - Power-ups
@@ -2832,7 +2922,7 @@ final class HabitStore {
         return claimedPowerUpThresholds
     }
 
-    /// Claims any power-up thresholds the balance has newly reached today and
+    /// Claims any power-up thresholds daily earnings have newly reached and
     /// awards their bonus coins (once each, resetting at midnight). Returns the
     /// total bonus awarded, or nil if nothing new was reached.
     @discardableResult
@@ -2841,7 +2931,7 @@ final class HabitStore {
         let isToday = last != nil && Calendar.current.isDateInToday(last!)
         var claimed = isToday ? claimedPowerUpThresholds : []
 
-        let coins = coinBalance
+        let coins = todayEarnedCoins
         let newly = Self.powerUpThresholds.filter { coins >= $0 && !claimed.contains($0) }
         guard !newly.isEmpty else {
             if !isToday {
@@ -2885,14 +2975,16 @@ final class HabitStore {
     // MARK: - Active habit session (Photo Proof home-screen timer)
 
     /// The habit timer shown on Home after a Photo-Proof session starts — apps
-    /// stay locked while it counts down, then it grants the reward and unlocks.
+    /// stay locked while it counts down, then it credits the earned coins.
     var activeHabitSession: ActiveHabitSession?
     /// Which method started the running session, so its reward lands in the
     /// right quest when the timer finishes.
     private var sessionMethod: HabitCategory = .photoTask
 
+    @discardableResult
     func startHabitSession(habitName: String, habitId: UUID? = nil, rewardMinutes: Int,
-                           sessionMinutes: Int, method: HabitCategory = .photoTask) {
+                           sessionMinutes: Int, method: HabitCategory = .photoTask) -> Bool {
+        guard !isSessionRunning, sessionMinutes > 0, rewardMinutes >= 0 else { return false }
         sessionMethod = method
         let total = max(1, sessionMinutes) * 60
         now = .now
@@ -2908,6 +3000,7 @@ final class HabitStore {
         // starting one changes the plan.
         Task { await refreshShield() }
         syncLiveActivity()
+        return true
     }
 
     func toggleHabitSessionPause() {

@@ -5,483 +5,381 @@
 
 import SwiftUI
 
-/// The Scroll Bank — where earned Aura coins are spent for screen time
-/// (1 coin = 1 minute). Opened from the Home "Scroll" card.
+/// Spend earned Aura coins on screen time, then hand off its count-up to Home.
 struct ScreentimeStoreView: View {
     @Environment(HabitStore.self) private var store
     @Environment(\.dismiss) private var dismiss
-
-    /// Opens on the cheapest option — the store shouldn't preselect a bigger
-    /// spend than the user asked for.
-    @State private var selectedMinutes = 5
-    @State private var receipt: ScrollReceipt?
-    @State private var checkingOut = false
-    @State private var showAmountSheet = false
-    /// Set once the paper and button have left. Everything stops drawing, so
-    /// the cover slides away over an empty field instead of revealing the
-    /// checkout that was sitting behind the receipt.
-    @State private var blankOut = false
-    /// A past purchase re-opened from the list. Separate from `receipt`, which
-    /// is the one that prints at the end of a checkout.
-    @State private var pastReceipt: ScrollReceipt?
-
-    // MARK: Checkout
-    //
-    // Checkout happens in place rather than in another sheet: the store's own
-    // chrome slides away, the reader drops in from above, and the card stays put
-    // and simply moves. A sheet would cross-fade the card into a copy of itself.
-    private enum Phase { case waiting, authorizing, done }
-    @State private var phase: Phase = .waiting
-    @State private var drag: CGFloat = 0
-    @State private var spin: Double = 0
-    /// Set the moment the checkmark lands, which fires the burst.
-    @State private var passedThreshold = false
-    @State private var dots = 0
-    @State private var dotTimer: Timer?
-
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isSpending = false
+    @State private var showPurchaseError = false
+    @State private var spendProgress: CGFloat = 0
+    @State private var balanceBeforeSpend = 0
+    /// Zero leaves all durations unselected until the user chooses one.
+    @State private var selectedMinutes = 0
+    @State private var hasSelection = false
 
-    /// How far up the card has to travel before it counts as tapped.
-    private let reachDistance: CGFloat = 150
-    /// Disc and resting-card frames, measured in the checkout coordinate space.
-    /// The landing offset is derived from these rather than guessed: an offset
-    /// doesn't affect layout, so any hardcoded number drifts the moment the
-    /// spacing above the card changes.
-    @State private var discFrame: CGRect = .zero
-    @State private var cardFrame: CGRect = .zero
-    /// The card's centre with no drag and no scale on it, captured once the
-    /// checkout layout has settled.
-    @State private var restingCardMidY: CGFloat = 0
-
-    /// The offset that puts the card's center on the disc's.
-    ///
-    /// Measured from the card at rest *in the checkout layout*. Mid-drag the
-    /// card is also being scaled by `proximity`, and the reported frame carries
-    /// that transform, so back-computing a resting position from it lands
-    /// 14pt differently depending on how far you swiped. The disc's own midY
-    /// is rock steady at 185 either way.
-    private var landedOffset: CGFloat {
-        guard discFrame != .zero, restingCardMidY != 0 else { return 0 }
-        // Divided by the scale because the offset is applied inside it: at
-        // landing the card is at 0.92, so an offset of X only travels X * 0.92
-        // on screen. Measured — 185 - 584.32 = -399.32 of travel needs -434 of
-        // offset, which is exactly the one swipe that used to land right.
-        return (discFrame.midY - restingCardMidY) / landingScale + landingTrim
+    // Illustration palette: deliberately darker blue under the top-down light.
+    private enum StoreArt {
+        static let blue = Color(red: 0.025, green: 0.31, blue: 0.72)
+        static let lowerBlue = Color(red: 0.015, green: 0.23, blue: 0.58)
+        static let cyanLight = Color(red: 0.37, green: 0.82, blue: 1)
+        static let banner = Color(red: 0.035, green: 0.15, blue: 0.37)
+        static let foxOpacity = 0.11
+        static let patternPeriod: Double = 40
+        static let bannerHeight: CGFloat = 38
     }
-
-    /// The card's scale at the moment it lands: `proximity` is 1 by then.
-    private var landingScale: CGFloat { 1 - 0.08 }
-
-    /// Residual trim, in points. Negative sits the card higher on the disc.
-    private let landingTrim: CGFloat = 0
-    private let discSize: CGFloat = 176
-
-    private func closePastReceipt() {
-        Haptics.impact(.light)
-        withAnimation(.easeInOut(duration: 0.32)) { pastReceipt = nil }
-    }
-
-    /// 0…1 as the card closes on the disc, so the reader reacts to the card
-    /// approaching instead of waiting for contact.
-    private var proximity: CGFloat { min(1, max(0, -drag / reachDistance)) }
-
-    // The Blocks-screen surface. White cards need a tinted ground to sit on,
-    // or their drop edges read as a stray smudge.
-    // The page is the button's blue, so everything that used to be dark on
-    // light inverts: white chrome, white reader, blue glyph inside it.
-    private let sheetColor = LightSheet.blue
 
     var body: some View {
-        VStack(spacing: 0) {
-
-            if !checkingOut && !blankOut {
-                header
-                    .padding(.top, Theme.Spacing.l)
-                    .transition(.move(edge: .top).combined(with: .opacity))
+        storeFront
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .allowsHitTesting(!isSpending)
+        .alert("Couldn't save your purchase", isPresented: $showPurchaseError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Your coins haven't been spent. Try again.")
+        }
+        .onAppear {
+            if store.pendingScreenTimePurchase != nil {
+                balanceBeforeSpend = store.coinBalance
+                isSpending = true
             }
+        }
+        .task(id: "\(isSpending)-\(scenePhase == .active)") {
+            guard isSpending, scenePhase == .active else { return }
+            await finishSpendAnimation()
+        }
+        .background(LightSheet.blue.ignoresSafeArea())
+    }
 
-            if checkingOut && receipt == nil && !blankOut {
-                VStack(spacing: 0) {
-                    reader
-                    amount
-                        .padding(.top, Theme.Spacing.xl)
-                        // Holds through authorizing — the cost is still the
-                        // relevant number until the payment actually lands —
-                        // then goes on the same curve as the caption below it.
-                        .opacity(phase == .done ? 0 : 1)
-                        .animation(.easeInOut(duration: 0.25), value: phase)
-                    caption
+    private var storeFront: some View {
+        GeometryReader { proxy in
+            let heroHeight = min(220, max(170, proxy.size.height * 0.25))
+            let artHeight = min(112, max(94, (proxy.size.width - 48) / 3 * 0.90))
+            ZStack {
+                storeBackground
+                foxPattern
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 0) {
+                        storeHeader
+                            .padding(.top, Theme.Spacing.l)
+                            .zIndex(1)
+
+                        ZStack {
+                            chestGlow(heroHeight: heroHeight)
+                            floatingChest(heroHeight: heroHeight)
+                        }
+                        .frame(height: heroHeight)
                         .padding(.top, Theme.Spacing.s)
-                }
-                .padding(.top, Theme.Spacing.xxl + Theme.Spacing.xxxl)
-                .transition(.opacity)
 
-                Spacer(minLength: Theme.Spacing.xxxl + Theme.Spacing.xl)
-            }
+                        HStack(alignment: .firstTextBaseline, spacing: Theme.Spacing.s) {
+                            SpendBalanceReel(
+                                from: isSpending ? balanceBeforeSpend : store.coinBalance,
+                                to: store.coinBalance,
+                                progress: isSpending ? spendProgress : 0)
+                            StrokedNumber(
+                                text: "coins",
+                                font: Typography.displayUIFont(size: 30, weight: .black),
+                                fill: .black, stroke: .white, outlineWidth: 2)
+                        }
+                        .padding(.top, Theme.Spacing.xl)
 
-            // Never conditional: the card is the one thing both layouts share,
-            // so it moves between positions instead of being torn down and
-            // rebuilt somewhere else.
-            card
-                .opacity(receipt == nil && !blankOut ? 1 : 0)
-                .padding(.horizontal, Theme.Spacing.xl)
-                .padding(.top, checkingOut ? 0 : Theme.Spacing.xxl)
-                .offset(y: drag)
-                .scaleEffect(1 - proximity * 0.08)
-                .opacity(phase == .done ? 0 : 1)
-                .gesture(cardSwipe)
-
-            if !checkingOut && !blankOut {
-                transactionsPanel
-                    .padding(.top, Theme.Spacing.xxl)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
-
-            if checkingOut && receipt == nil && !blankOut {
-                nevermindButton
-                    .padding(.top, Theme.Spacing.l)
-                    .padding(.bottom, Theme.Spacing.xxl)
-                    .opacity(phase == .waiting ? 1 : 0)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .coordinateSpace(name: "checkout")
-        .onPreferenceChange(DiscFrameKey.self) { discFrame = $0 }
-        .onPreferenceChange(AuraCardFrameKey.self) { frame in
-            cardFrame = frame
-            // Only in checkout, and only while it's home: before checkout the
-            // card sits somewhere else entirely, and mid-drag it's scaled.
-            if checkingOut, drag == 0 { restingCardMidY = frame.midY }
-        }
-        .background(sheetColor.ignoresSafeArea())
-        .sheet(isPresented: $showAmountSheet) {
-            BuyScreentimeSheet { minutes in
-                selectedMinutes = minutes
-                // Same frame the sheet starts dropping on, so the card is
-                // already sliding into its swipe-up position behind it.
-                withAnimation(.snappy(duration: 0.45)) { checkingOut = true }
-            }
-        }
-        .overlay {
-            if pastReceipt != nil {
-                // Dims the store behind a re-opened receipt. The fresh one
-                // doesn't need this — it prints over its own checkout, which
-                // is already the whole screen.
-                Color.black.opacity(0.45)
-                    .ignoresSafeArea()
-                    .transition(.opacity)
-                    .onTapGesture { closePastReceipt() }
-                    .zIndex(1)
-            }
-
-            if let pastReceipt {
-                ReceiptPreviewView(receipt: pastReceipt) { closePastReceipt() }
-                    // Leaves the way it came in.
-                    .transition(.move(edge: .top))
-                    .zIndex(2)
-            }
-        }
-        // An overlay rather than a cover: a cover always slides up from the
-        // bottom, and the receipt should print downward from the top.
-        .overlay {
-            if let receipt {
-                ScrollReceiptView(receipt: receipt) {
-                    Haptics.impact(.medium)
-                    // The clock starts here, not at payment — nobody's minutes
-                    // should be draining while they read the receipt.
-                    store.startPurchasedScreenTime(minutes: selectedMinutes)
-                    // Pull the paper out of the hierarchy before dismissing. It
-                    // has already slid off screen, so removing it is invisible
-                    // — and leaving it mounted lets it come back as a fresh
-                    // instance mid-dismissal and replay its entrance.
-                    var instant = Transaction()
-                    instant.disablesAnimations = true
-                    withTransaction(instant) {
-                        blankOut = true
-                        self.receipt = nil
+                        durationGrid(artHeight: artHeight)
+                            .padding(.top, Theme.Spacing.xxl)
+                            .padding(.horizontal, Theme.Spacing.l)
+                            .padding(.bottom, Theme.Spacing.l)
                     }
-                    dismiss()
+                    .frame(maxWidth: .infinity)
                 }
-                .transition(.move(edge: .top))
+                .safeAreaInset(edge: .bottom, spacing: 0) {
+                    LightPrimaryButton(
+                        title: "Buy Screentime",
+                        coins: hasSelection ? selectedMinutes : nil,
+                        face: .white,
+                        textColor: .black,
+                        shade: LightSheet.whiteShadeOnColour,
+                        enabled: hasSelection && selectedMinutes <= store.coinBalance,
+                        depth: 6,
+                        action: buySelectedTime)
+                    .padding(.horizontal, Theme.Spacing.l)
+                    .padding(.top, Theme.Spacing.m)
+                    .padding(.bottom, Theme.Spacing.l)
+                }
             }
         }
     }
 
-    // MARK: - Checkout
-
-    private var reader: some View {
-        ZStack {
-            // Two pings on the same 2.4s cycle, the second half a cycle late so
-            // a new ring leaves as the last one fades.
-            //
-            // Driven off the timeline rather than `repeatForever`: a repeating
-            // animation started in `onAppear` gets cancelled by any other
-            // transaction touching this view — the drag, the phase change, the
-            // dots timer — and never restarts. Derived from elapsed time it
-            // can't be interrupted.
-            if !reduceMotion, phase == .waiting {
-                TimelineView(.animation) { context in
-                    let t = context.date.timeIntervalSinceReferenceDate
-                    ZStack {
-                        sonarRing(progress: ringProgress(t, offset: 0))
-                        sonarRing(progress: ringProgress(t, offset: 0.5))
-                    }
-                }
+    private var storeBackground: some View {
+        GeometryReader { proxy in
+            ZStack(alignment: .top) {
+                LinearGradient(colors: [StoreArt.blue, StoreArt.lowerBlue],
+                               startPoint: .top, endPoint: .bottom)
+                Ellipse()
+                    .fill(RadialGradient(
+                        colors: [StoreArt.cyanLight.opacity(0.65), StoreArt.cyanLight.opacity(0.23), .clear],
+                        center: .top, startRadius: 0, endRadius: proxy.size.height * 0.72))
+                    .frame(width: proxy.size.width * 1.55, height: proxy.size.height * 1.25)
+                    .position(x: proxy.size.width * 0.5, y: proxy.size.height * 0.25)
             }
+            // Keep oversized illumination inside the moving cover during its
+            // presentation and dismissal; it must never paint over Home.
+            .frame(width: proxy.size.width, height: proxy.size.height)
+            .clipped()
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+    }
 
-            // The resting halo the pings leave behind. Widens as the card
-            // closes in, then holds while authorizing.
-            //
-            // This is the frame the card lands on: it's the outer edge you can
-            // actually see, so centring on it is centring on what's on screen.
-            // Measured before the scale so the target doesn't move as the card
-            // approaches and grows it.
-            Circle()
-                .fill(.white.opacity(0.18))
-                .frame(width: discSize + 34, height: discSize + 34)
-                .background(
-                    GeometryReader { proxy in
-                        Color.clear.preference(
-                            key: DiscFrameKey.self,
-                            value: proxy.frame(in: .named("checkout"))
-                        )
-                    }
-                )
-                .scaleEffect(1 + proximity * 0.10)
+    private var storeHeader: some View {
+        HStack {
+            closeButton
+            Spacer()
+            ExplainerButton(explainer: QuestExplainer.coins, onBlue: true)
+        }
+        .padding(.horizontal, Theme.Spacing.xl)
+    }
 
-            Circle()
-                .fill(.white)
-                .frame(width: discSize, height: discSize)
-                .shadow(color: .black.opacity(0.18), radius: 22, y: 10)
+    private func chestGlow(heroHeight: CGFloat) -> some View {
+        // Match the approved 1040×1400 preview: its chest occupies a 732pt
+        // frame centered at y826, and the lowered ring is centered at y1160.
+        let lightingHeight = heroHeight * 1400 / 732 * 1.15
+        let lightingWidth = heroHeight * 1040 / 732 * 1.30
+        let ringCenter = heroHeight * (1160 - 826) / 732
+        let verticalOffset = ringCenter - lightingHeight * (1160.0 / 1400 - 0.5)
+        return TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: reduceMotion)) { context in
+            let time = context.date.timeIntervalSinceReferenceDate
+            let brightness = reduceMotion ? 1 : 0.96 + sin(time * 1.2) * 0.04
+            Image("AuraStoreChestLightingB")
+                .resizable()
+                .interpolation(.high)
+                .frame(width: lightingWidth, height: lightingHeight)
+                .mask {
+                    // A broad eased feather avoids a visible straight boundary
+                    // where the bright PNG meets the blue screen.
+                    LinearGradient(stops: [
+                        .init(color: .clear, location: 0),
+                        .init(color: .white.opacity(0.02), location: 0.04),
+                        .init(color: .white.opacity(0.10), location: 0.08),
+                        .init(color: .white.opacity(0.26), location: 0.12),
+                        .init(color: .white.opacity(0.50), location: 0.18),
+                        .init(color: .white.opacity(0.76), location: 0.24),
+                        .init(color: .white.opacity(0.94), location: 0.30),
+                        .init(color: .white, location: 0.36),
+                        .init(color: .white, location: 0.64),
+                        .init(color: .white.opacity(0.94), location: 0.70),
+                        .init(color: .white.opacity(0.76), location: 0.76),
+                        .init(color: .white.opacity(0.50), location: 0.82),
+                        .init(color: .white.opacity(0.26), location: 0.88),
+                        .init(color: .white.opacity(0.10), location: 0.92),
+                        .init(color: .white.opacity(0.02), location: 0.96),
+                        .init(color: .clear, location: 1)
+                    ], startPoint: .leading, endPoint: .trailing)
+                }
+                .mask {
+                    // Preserve the ring, then ease the remaining bloom to
+                    // transparent before the bitmap's lower boundary.
+                    LinearGradient(stops: [
+                        .init(color: .white, location: 0),
+                        .init(color: .white, location: 0.88),
+                        .init(color: .white.opacity(0.85), location: 0.91),
+                        .init(color: .white.opacity(0.50), location: 0.94),
+                        .init(color: .white.opacity(0.15), location: 0.97),
+                        .init(color: .clear, location: 1)
+                    ], startPoint: .top, endPoint: .bottom)
+                }
+                .opacity(brightness)
+                .offset(y: verticalOffset)
+        }
+        .frame(width: lightingWidth, height: heroHeight)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
 
-            switch phase {
-            case .waiting:
-                // Template + tint: the artwork is a flat silhouette, so the
-                // colour belongs in code rather than in a second export.
-                Image("AuraTapToPay")
-                    .renderingMode(.template)
+    private func floatingChest(heroHeight: CGFloat) -> some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: reduceMotion)) { context in
+            let phase = context.date.timeIntervalSinceReferenceDate * .pi / 2
+            let bob = reduceMotion ? 0 : sin(phase) * 3
+            ZStack {
+                Image("AuraStoreOpenChest")
                     .resizable()
                     .interpolation(.high)
                     .scaledToFit()
-                    .foregroundStyle(LightSheet.blue)
-                    .frame(width: discSize * 0.52)
+                    .frame(height: heroHeight)
+                heroStars(heroHeight: heroHeight)
+            }
+            .offset(y: Theme.Spacing.xs + bob)
+        }
+    }
 
-            case .authorizing:
-                Circle()
-                    .trim(from: 0, to: 0.22)
-                    .stroke(LightSheet.blue, style: StrokeStyle(lineWidth: 5, lineCap: .round))
-                    .frame(width: discSize * 0.42, height: discSize * 0.42)
-                    .rotationEffect(.degrees(spin))
-                    .onAppear {
-                        withAnimation(.linear(duration: 0.8).repeatForever(autoreverses: false)) {
-                            spin = 360
+    private func heroStars(heroHeight: CGFloat) -> some View {
+        let placements: [(CGFloat, CGFloat, CGFloat, Double)] = [
+            (-0.64, -0.32, 24, 0.0), (-0.39, -0.49, 20, 0.7),
+            (0.40, -0.49, 18, 1.4), (0.64, -0.18, 22, 2.1),
+            (-0.64, 0.22, 20, 2.8), (0.64, 0.38, 24, 3.5)
+        ]
+        return ZStack {
+            ForEach(0..<placements.count, id: \.self) { index in
+                let item = placements[index]
+                IceSparkle(size: item.2, delay: item.3)
+                    .colorMultiply(LightSheet.starGold)
+                    .offset(x: item.0 * heroHeight, y: item.1 * heroHeight)
+            }
+        }
+        .allowsHitTesting(false)
+    }
+
+    private var foxPattern: some View {
+        GeometryReader { proxy in
+            let pitch = proxy.size.width / 6
+            let rowPitch = pitch * 1.32
+            let rows = Int(ceil(proxy.size.height / rowPitch)) + 4
+            TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: reduceMotion)) { context in
+                // A two-row translation returns the staggered lattice to itself.
+                let progress = reduceMotion ? 0 : context.date.timeIntervalSinceReferenceDate
+                    .truncatingRemainder(dividingBy: StoreArt.patternPeriod) / StoreArt.patternPeriod
+                ZStack {
+                    ForEach(-2..<rows, id: \.self) { row in
+                        ForEach(-2..<9, id: \.self) { column in
+                            Image("NavHomeSticker")
+                                .renderingMode(.original)
+                                .resizable()
+                                .interpolation(.high)
+                                .scaledToFit()
+                                .saturation(0)
+                                .frame(width: pitch * 0.56, height: pitch * 0.56)
+                                .rotationEffect(.degrees(15))
+                                .position(
+                                    x: (CGFloat(column) + (row.isMultiple(of: 2) ? 0.25 : 0.75)) * pitch - progress * pitch,
+                                    y: CGFloat(row) * rowPitch + progress * rowPitch * 2)
                         }
                     }
-
-            case .done:
-                Image(systemName: "checkmark")
-                    .font(.system(size: 62, weight: .bold))
-                    .foregroundStyle(LightSheet.blue)
+                }
+                .opacity(StoreArt.foxOpacity)
             }
+            .frame(width: proxy.size.width, height: proxy.size.height)
+            .clipped()
         }
-        .animation(.snappy(duration: 0.25), value: phase)
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
     }
 
-    /// 0…1 through one 2.4s ping, `offset` staggering the second ring.
-    private func ringProgress(_ time: TimeInterval, offset: Double) -> Double {
-        let cycle = 2.4
-        return ((time / cycle) + offset).truncatingRemainder(dividingBy: 1)
-    }
+    private func durationGrid(artHeight: CGFloat) -> some View {
+        let options = [5, 10, 15, 30, 45, 60]
+        return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Theme.Spacing.s), count: 3), spacing: Theme.Spacing.s) {
+            ForEach(options, id: \.self) { minutes in
+                let selected = hasSelection && selectedMinutes == minutes
+                Button {
+                    guard minutes <= store.coinBalance else { return }
+                    Haptics.impact(.light)
+                    withAnimation(.spring(response: 0.24, dampingFraction: 0.55)) {
+                        selectedMinutes = minutes
+                        hasSelection = true
+                    }
+                } label: {
+                    VStack(spacing: 0) {
+                        durationArt(for: minutes)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: artHeight)
 
-    private func sonarRing(progress: Double) -> some View {
-        // Eased out so it leaves quickly and drifts to a stop, and faded to
-        // nothing at the peak so the loop point is invisible.
-        let eased = 1 - pow(1 - progress, 3)
-        return Circle()
-            .fill(.white.opacity(0.22))
-            .frame(width: discSize + 34, height: discSize + 34)
-            .scaleEffect(1 + 0.55 * eased)
-            .opacity(0.4 * (1 - eased))
-    }
-
-    private var caption: some View {
-        HStack(spacing: 0) {
-            Text(captionText)
-            if phase == .authorizing {
-                // All three dots hold their space, so the line doesn't shuffle
-                // sideways as they light up one at a time.
-                HStack(spacing: 0) {
-                    ForEach(0..<3, id: \.self) { i in
-                        Text(".").opacity(dots > i ? 1 : 0)
+                        ZStack {
+                            Rectangle()
+                                .fill(selected ? LightSheet.starGold : StoreArt.banner)
+                            Text("\(minutes) min")
+                                .auraFont(.body, SheetType.cardTitle, .bold)
+                                .foregroundStyle(selected ? Theme.Color.background : .white)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(height: StoreArt.bannerHeight)
+                    }
+                    // Keep the art field saturated so the hard cyan burst reads behind each pile.
+                    .background(StoreArt.blue, in: RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
+                            .strokeBorder(selected ? LightSheet.starGold : .white.opacity(0.45), lineWidth: selected ? 2 : 1)
                     }
                 }
-                .animation(.easeInOut(duration: 0.15), value: dots)
+                .buttonStyle(PressBounceStyle())
+                .disabled(minutes > store.coinBalance)
+                .accessibilityLabel("\(minutes) minutes")
+                .accessibilityAddTraits(selected ? .isSelected : [])
             }
         }
-        .auraFont(.body, SheetType.cardTitle, .semibold)
-        .foregroundStyle(.white)
-        .opacity(phase == .done ? 0 : 1)
-        .animation(.easeInOut(duration: 0.25), value: phase)
     }
 
-    private var captionText: String {
-        switch phase {
-        case .waiting:     return "Swipe your card up to pay"
-        case .authorizing: return "Authorizing payment"
-        // Kept, not blanked: the line fades out on `.done`, and emptying the
-        // string would clear it before the fade could run.
-        case .done:        return "Authorizing payment"
-        }
-    }
-
-    /// What it costs, between the reader and the instruction. No "Total" label
-    /// — the coin says what the number is.
-    private var amount: some View {
-        HStack(spacing: Theme.Spacing.s) {
-            Image("AuraCoinIcon")
+    private func durationArt(for minutes: Int) -> some View {
+        GeometryReader { proxy in
+            Image("AuraStoreCardRays")
                 .resizable()
                 .interpolation(.high)
-                .scaledToFit()
-                .frame(width: 36, height: 36)
-            Text("\(selectedMinutes)")
-                .auraFont(.display, 38, .bold)
-                .foregroundStyle(.white)
+                .scaledToFill()
+                .frame(width: proxy.size.width, height: proxy.size.height)
+                .overlay {
+                    Image("AuraStoreChoice\(minutes)")
+                        .resizable()
+                        .interpolation(.high)
+                        .scaledToFit()
+                        .frame(width: minutes == 45 ? proxy.size.width * 0.80 : proxy.size.width * coinPileScale(for: minutes) * 1.20,
+                               height: minutes == 45 ? proxy.size.height - Theme.Spacing.m : (proxy.size.height - Theme.Spacing.s) * 1.20)
+                }
+                .overlay {
+                    ZStack {
+                        IceSparkle(size: 10, delay: 0.2)
+                            .position(x: proxy.size.width * 0.15, y: proxy.size.height * 0.25)
+                        IceSparkle(size: 8, delay: 0.6)
+                            .position(x: proxy.size.width * 0.84, y: proxy.size.height * 0.20)
+                        IceSparkle(size: 7, delay: 1.0)
+                            .position(x: proxy.size.width * 0.87, y: proxy.size.height * 0.72)
+                    }
+                }
+                .clipped()
         }
     }
 
-    private var nevermindButton: some View {
-        Button {
-            Haptics.impact(.light)
-            withAnimation(.snappy(duration: 0.45)) {
-                checkingOut = false
-                drag = 0
-            }
-        } label: {
-            Text("Nevermind")
-                .auraFont(.body, 15, .bold)
-                .foregroundStyle(.white.opacity(0.7))
-                .padding(.vertical, Theme.Spacing.s)
-                .padding(.horizontal, Theme.Spacing.l)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var cardSwipe: some Gesture {
-        DragGesture()
-            .onChanged { value in
-                guard checkingOut, phase == .waiting else { return }
-                if drag == 0 { Haptics.impact(.light, intensity: 0.7) }
-                // Upward only — dragging back down just returns to rest.
-                drag = min(0, value.translation.height)
-
-                // A detent at the threshold, so releasing-will-work is
-                // something the hand knows rather than something to guess.
-                let past = -drag >= reachDistance
-                if past != passedThreshold {
-                    passedThreshold = past
-                    if past { Haptics.impact(.rigid, intensity: 0.8) }
-                }
-            }
-            .onEnded { _ in
-                guard checkingOut, phase == .waiting else { return }
-                passedThreshold = false
-                if -drag >= reachDistance {
-                    tap()
-                } else {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) { drag = 0 }
-                }
-            }
-    }
-
-    /// Card lands on the reader, authorizes, then prints the receipt. The swipe
-    /// is the commit — backing out of checkout costs nothing.
-    private func tap() {
-        // Up onto the disc, held there while it authorizes, then back down to
-        // where it started.
-        withAnimation(.spring(response: 0.42, dampingFraction: 0.82)) { drag = landedOffset }
-        withAnimation(.snappy(duration: 0.25).delay(0.3)) { phase = .authorizing }
-
-        // Contact lands with the card, not with the finger lifting.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) {
-            Haptics.transient(intensity: 0.9, sharpness: 0.7)
-            // The hum under the spinner — the one thing UIKit's generators
-            // can't do, and the reason the pause doesn't feel like a stall.
-            Haptics.startRumble(intensity: 0.22, sharpness: 0.1, duration: 1.8)
-        }
-
-        dots = 0
-        dotTimer?.invalidate()
-        dotTimer = Timer.scheduledTimer(withTimeInterval: 0.35, repeats: true) { _ in
-            dots = (dots + 1) % 4
-        }
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) { drag = 0 }
-
-            guard store.chargeForScreenTime(minutes: selectedMinutes) else {
-                Haptics.stopRumble()
-                Haptics.notify(.error)
-                withAnimation(.snappy(duration: 0.3)) {
-                    checkingOut = false
-                    drag = 0
-                    phase = .waiting
-                }
-                return
-            }
-            dotTimer?.invalidate()
-            dotTimer = nil
-            Haptics.stopRumble()
-            // Checkmark once the card is clear of the disc.
-            withAnimation(.snappy(duration: 0.25).delay(0.3)) { phase = .done }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { Haptics.notify(.success) }
-
-            // A beat on the checkmark so the payment reads as settled before
-            // the paper starts printing over it.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                // Slow enough to watch the paper travel — a quick slide reads
-                // as a screen swap rather than something printing.
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    Haptics.impact(.soft)
-                }
-                withAnimation(.spring(response: 0.85, dampingFraction: 0.88)) {
-                    receipt = ScrollReceipt(
-                        name: store.displayName,
-                        minutes: selectedMinutes,
-                        coins: selectedMinutes,
-                        date: .now
-                    )
-                }
-                // Checkout stays up behind the paper. Resetting here would
-                // rebuild the store's picker and button underneath it, which
-                // shows through as the receipt slides down.
-            }
+    private func coinPileScale(for minutes: Int) -> CGFloat {
+        switch minutes {
+        case 5: return 0.78
+        case 10: return 0.83
+        case 15: return 0.87
+        case 30: return 0.92
+        case 45: return 0.97
+        default: return 1
         }
     }
 
-    // MARK: - Header
-
-    /// The balance IS the header.
-    ///
-    /// It was a row of its own under a "Screentime Store" title, which put four
-    /// things — title, X, `?`, balance — in the top third before the card. The
-    /// title was the one confirming something you already knew: you opened this
-    /// from the Scroll card. Dropping it gives the balance the empty middle of a
-    /// row that already existed.
-    private var header: some View {
-        ZStack {
-            balanceLine
-
-            // X left, `?` right — the pairing every quest screen uses, so help
-            // is in the same corner wherever you are.
-            HStack {
-                closeButton
-                Spacer()
-                ExplainerButton(explainer: QuestExplainer.coins, onBlue: true)
-            }
+    private func buySelectedTime() {
+        guard !isSpending, hasSelection, selectedMinutes > 0,
+              selectedMinutes <= store.coinBalance else { return }
+        balanceBeforeSpend = store.coinBalance
+        guard store.beginPendingScreenTimePurchase(minutes: selectedMinutes) else {
+            showPurchaseError = true
+            Haptics.notify(.error)
+            return
         }
-        .padding(.horizontal, Theme.Spacing.xl)
+        Haptics.impact(.medium)
+        isSpending = true
+    }
+
+    @MainActor
+    private func finishSpendAnimation() async {
+        guard store.pendingScreenTimePurchase != nil else { return }
+        spendProgress = 0
+        do {
+            try await Task.sleep(for: .milliseconds(20))
+            try Task.checkCancellation()
+        } catch { return }
+        withAnimation(.easeOut(duration: reduceMotion ? 0.15 : 0.70)) {
+            spendProgress = 1
+        }
+        do {
+            try await Task.sleep(for: .milliseconds(reduceMotion ? 150 : 700))
+            try Task.checkCancellation()
+            guard scenePhase == .active else { return }
+            NotificationCenter.default.post(name: .auraPurchasedTimeReady, object: nil)
+            dismiss()
+        } catch {
+            // Payment stays durable. Resume the handoff when the scene returns.
+        }
     }
 
     private var closeButton: some View {
@@ -489,208 +387,46 @@ struct ScreentimeStoreView: View {
                          glyphColor: .white, bounces: false) { dismiss() }
     }
 
-    // MARK: - Card
-
-    private var card: some View {
-        AuraBankCard(cardholder: "Hayden Berio", measureIn: "checkout")
-    }
-
-    /// The balance, on the field rather than in a card.
-    ///
-    /// It had its own white card directly under the payment card — two
-    /// card-shaped objects stacked, and the plain one was competing with the
-    /// thing the screen is actually about. As a line on the blue it costs no
-    /// shape at all, and the card gets to be the only card here.
-    private var balanceLine: some View {
-        HStack(spacing: Theme.Spacing.s) {
-            Image("AuraCoinIcon")
-                .resizable()
-                .interpolation(.high)
-                .scaledToFit()
-                .frame(width: Self.balanceCoin, height: Self.balanceCoin)
-            Text("\(store.coinBalance)")
-                .auraFont(.display, Self.balanceFigure, .bold)
-                    .foregroundStyle(.white)
-                    .monospacedDigit()
-                    .contentTransition(.numericText())
-        }
-    }
-
-    /// The balance is context above the card, not the headline of the screen —
-    /// it took Stats' 34pt figure and read as the loudest thing here. The coin
-    /// is derived from the numeral so the two can't drift.
-    private static let balanceFigure = SheetType.title
-    private static let balanceCoin = balanceFigure * 1.2
-
-    // MARK: - Recent transactions
-
-    /// Fills the bottom of the screen: rows scroll inside it, the CTA sits at
-    /// its foot. Today only — this is a running tally of what you've spent
-    /// since midnight, not an archive.
-    private var transactionsPanel: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.l) {
-            Text("Recent Transactions")
-                .auraFont(.display, 17, .bold)
-                .foregroundStyle(SheetType.titleColor)
-                .padding(.horizontal, Theme.Spacing.xl)
-                .padding(.top, Theme.Spacing.xl)
-
-            // The empty state skips the scroll view entirely. A `ScrollView`
-            // sizes itself to its content, so anything inside it can't centre in
-            // the panel — it can only sit at the top of a box its own height.
-            if todaysPurchases.isEmpty {
-                transactions
-                    .padding(.horizontal, Theme.Spacing.xl)
-            } else {
-                ScrollView(showsIndicators: false) {
-                    transactions
-                        .padding(.horizontal, Theme.Spacing.xl)
-                        .padding(.bottom, Theme.Spacing.l)
-                }
-            }
-
-            buyButton
-                .padding(.horizontal, Theme.Spacing.xl)
-                .padding(.bottom, Theme.Spacing.l)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(
-            UnevenRoundedRectangle(topLeadingRadius: Theme.Radius.sheet, topTrailingRadius: Theme.Radius.sheet, style: .continuous)
-                .fill(Color.white)
-                .ignoresSafeArea(edges: .bottom)
-        )
-    }
-
-    /// Purchases made today, newest first.
-    private var todaysPurchases: [HabitStore.Purchase] {
-        store.purchases.filter { Calendar.current.isDateInToday($0.date) }
-    }
-
-    private var transactions: some View {
-        VStack(spacing: Theme.Spacing.s) {
-            if todaysPurchases.isEmpty {
-                // Same shape as the habit list's empty state: art at 86, a bold
-                // line, a quiet one under it.
-                VStack(spacing: Theme.Spacing.m) {
-                    Image("ScreentimeStoreEmptyState")
-                        .resizable()
-                        .interpolation(.high)
-                        .scaledToFit()
-                        .frame(height: 132)
-                        .shadow(color: .black.opacity(0.16), radius: 12, y: 5)
-
-                    VStack(spacing: Theme.Spacing.xs) {
-                        Text("No purchases today")
-                            .auraFont(.display, SheetType.sectionHeader, .bold)
-                            .foregroundStyle(SheetType.titleColor)
-                        Text("Screentime you buy shows up here.")
-                            .auraFont(.body, SheetType.subtitle, .regular)
-                            .foregroundStyle(SheetType.subtitleColor)
-                    }
-                    .multilineTextAlignment(.center)
-                }
-                // Centred in what's left under the heading rather than sitting
-                // just below it — an empty state pinned to the top of a tall
-                // panel reads as content that failed to load.
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                ForEach(todaysPurchases) { purchase in
-                    transactionRow(purchase)
-                }
-            }
-        }
-    }
-
-    private func transactionRow(_ purchase: HabitStore.Purchase) -> some View {
-        Button {
-            Haptics.impact(.light)
-            pastReceipt = ScrollReceipt(
-                name: store.displayName,
-                minutes: purchase.minutes,
-                coins: purchase.minutes,
-                date: purchase.date
-            )
-        } label: {
-            HStack(spacing: Theme.Spacing.m) {
-                receiptThumb
-
-                VStack(alignment: .leading, spacing: RowType.labelGap) {
-                    Text(FocusDuration.label(purchase.minutes))
-                        .auraFont(.body, RowType.label, .semibold)
-                        .foregroundStyle(RowType.labelColor)
-                    Text(Self.stamp.string(from: purchase.date))
-                        .auraFont(.body, RowType.subLabel, .medium)
-                        .foregroundStyle(LightSheet.subtitle)
-                }
-
-                Spacer(minLength: Theme.Spacing.s)
-
-                // Signed, because this is the one list in the app where the
-                // number goes down.
-                HStack(spacing: 4) {
-                    Image("AuraCoinIcon")
-                        .resizable()
-                        .interpolation(.high)
-                        .scaledToFit()
-                        .frame(width: 15, height: 15)
-                    // Keeps the red — it's the one list where the number goes
-                    // down — but drops to the row scale's weight and size.
-                    Text("-\(purchase.minutes)")
-                        .auraFont(.body, RowType.value, .medium)
-                        .foregroundStyle(LightSheet.danger)
-                }
-            }
-            .padding(Theme.Spacing.m)
-            .contentShape(Rectangle())
-            // A plain white card, like every other row in the app. The store's
-            // page is blue, so it takes the on-colour drop edge the habit rows
-            // use rather than the translucent one meant for a white ground.
-            .bottomDropCard(radius: Theme.Radius.card, shade: LightSheet.whiteShadeOnColour)
-        }
-        .buttonStyle(PressBounceStyle())
-    }
-
-    /// The receipt itself, shrunk to a marker: the same torn shape as the real
-    /// one with a few ruled lines. Says what tapping the row will give you.
-    private var receiptThumb: some View {
-        Image("ScreentimeStoreReceipt")
-            .resizable()
-            .interpolation(.high)
-            .scaledToFit()
-            // Contour + shadow are baked into the sticker now.
-            .frame(height: 40)
-    }
-
-    private static let stamp: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "h:mm a"
-        return f
-    }()
-
-    private var buyButton: some View {
-        Button {
-            Haptics.impact(.medium)
-            showAmountSheet = true
-        } label: {
-            Text("Buy Screentime")
-                .font(SheetType.ctaFont)
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .frame(height: 56)
-                .blueDropCapsule()
-        }
-        .buttonStyle(.plain)
-    }
 }
 
-/// Both keys ignore empty values when reducing. Every sibling that doesn't set
-/// the key still contributes `defaultValue`, so a plain `value = nextValue()`
-/// lets the last sibling wipe out the one measurement that mattered.
-private struct DiscFrameKey: PreferenceKey {
-    static let defaultValue: CGRect = .zero
-    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
-        let next = nextValue()
-        if next != .zero { value = next }
+/// Local, outlined decimal reels. Payment is durable before this presentation;
+/// only the displayed balance waits for its digits to settle.
+private struct SpendBalanceReel: View {
+    let from: Int
+    let to: Int
+    var progress: CGFloat
+
+    private var font: UIFont { Typography.displayUIFont(size: 56, weight: .black, tabular: true) }
+    private var glyphWidth: CGFloat { ("0" as NSString).size(withAttributes: [.font: font]).width + 6 }
+    private var glyphHeight: CGFloat { font.lineHeight + 6 }
+
+    var body: some View {
+        let old = Array(String(from))
+        let target = Array(String(repeating: " ", count: max(0, old.count - String(to).count)) + String(to))
+        HStack(spacing: -6) {
+            ForEach(old.indices, id: \.self) { index in
+                let values = reel(from: old[index], to: target[index])
+                VStack(spacing: 0) {
+                    ForEach(values.indices, id: \.self) { row in
+                        StrokedNumber(text: String(values[row]), font: font,
+                                      fill: .black, stroke: .white, outlineWidth: 3)
+                            .frame(width: glyphWidth, height: glyphHeight)
+                    }
+                }
+                .offset(y: -progress * CGFloat(values.count - 1) * glyphHeight)
+                .frame(width: glyphWidth, height: glyphHeight, alignment: .top)
+                .clipped()
+            }
+        }
+        .padding(.horizontal, 3)
+        .accessibilityLabel("\(to)")
+    }
+
+    private func reel(from: Character, to: Character) -> [Character] {
+        guard from != to else { return [from] }
+        guard let start = from.wholeNumberValue, let end = to.wholeNumberValue else { return [from, to] }
+        let steps = (start - end + 10) % 10
+        return (0...steps).map { Character(String((start - $0 + 10) % 10)) }
     }
 }
 

@@ -51,7 +51,7 @@ struct HabitRoutineSheet: View {
                 // pulled up so the same gap sits under it. `LightSheetTitle`
                 // carries a 28pt inset built for a title directly under the
                 // drag capsule; -xs leaves ~24 to match the top.
-                Image("FoxCreateRoutine")
+                Image("CreateRoutineReminder")
                     .resizable()
                     .interpolation(.high)
                     .scaledToFit()
@@ -159,7 +159,7 @@ struct HabitRoutineSheet: View {
                         .frame(width: 40, height: 40)
                         .background(Circle().fill(on ? accent : LightSheet.field))
                 }
-                .buttonStyle(PressBounceStyle())
+                .buttonStyle(PressBounceStyle(hapticsEnabled: false))
                 .frame(maxWidth: .infinity)
             }
         }
@@ -218,5 +218,3 @@ struct HabitRoutineSheet: View {
         }
     }
 }
-
-

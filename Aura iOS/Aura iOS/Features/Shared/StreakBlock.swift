@@ -89,7 +89,7 @@ struct StreakGoalCard: View {
                     .shadow(color: .black.opacity(0.22), radius: 4, y: 1)
                 Spacer(minLength: Theme.Spacing.m)
                 Text("\(streak)/\(goal)")
-                    .auraFont(.display, 16, .semibold)
+                    .auraFont(.body, 16, .semibold)
                     .foregroundStyle(.white.opacity(0.85))
                     .shadow(color: .black.opacity(0.22), radius: 4, y: 1)
             }
@@ -145,13 +145,13 @@ struct StreakGoalCard: View {
 
     /// A calendar sticker with the day number centred on its white body.
     private func calendarMarker(_ n: Int) -> some View {
-        Image("Stats90DayCalendar")
+        Image("StreakGoalCalendar")
             .resizable()
             .interpolation(.high)
             .scaledToFit()
             .overlay(alignment: .center) {
                 Text("\(n)")
-                    .auraFont(.display, 15, .bold)
+                    .auraFont(.body, 15, .bold)
                     .foregroundStyle(.black)
                     .minimumScaleFactor(0.4)
                     .lineLimit(1)

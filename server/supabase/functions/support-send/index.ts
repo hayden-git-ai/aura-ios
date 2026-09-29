@@ -22,9 +22,10 @@ import { checkedFetch } from "../_shared/checked-fetch.ts";
 import {
   createFreshSignedSupportURL,
   fetchTrustedSupportMedia,
-  rasterWithinPixelBudget,
   trustedSupportMedia,
 } from "../_shared/support-media.ts";
+
+import { supportAttachmentKind } from "../_shared/support-attachment.ts";
 
 const CRISP_API = "https://api.crisp.chat/v1";
 // The Slack channel used only as a heads-up feed (non-secret channel id).
@@ -46,9 +47,13 @@ Deno.serve(async (request: Request): Promise<Response> => {
   if (!uid) return json({ error: "unauthorized" }, 401);
 
   let text = "";
+  let clientMessageId = "";
   let mediaUrl = "", mediaMime = "", mediaName = "";
   try {
     const body = await request.json();
+    clientMessageId = typeof body?.client_message_id === "string"
+      ? body.client_message_id.toLowerCase()
+      : "";
     text = typeof body?.text === "string" ? body.text.trim() : "";
     mediaUrl = typeof body?.media_url === "string" ? body.media_url : "";
     mediaMime = typeof body?.media_mime === "string" ? body.media_mime : "";
@@ -57,6 +62,8 @@ Deno.serve(async (request: Request): Promise<Response> => {
     return json({ error: "bad request" }, 400);
   }
   if (!text && !mediaUrl) return json({ error: "empty" }, 400);
+  const retryableClient = isUUID(clientMessageId);
+  if (!retryableClient) clientMessageId = crypto.randomUUID();
   if (text.length > MAX_LEN) text = text.slice(0, MAX_LEN);
   if (!mediaUrl) { mediaMime = ""; mediaName = ""; }
 
@@ -65,25 +72,27 @@ Deno.serve(async (request: Request): Promise<Response> => {
   if (!url || !serviceKey) return json({ error: "server misconfigured" }, 500);
 
   // 0. Every attachment must be this user's exact private Storage object and a
-  //    decodable image. Caller-provided MIME is never a trust signal.
+  //    supported image, document or audio file. Caller MIME is not trusted.
   if (mediaUrl) {
-    const sanitizedURL = await sanitizeStoredImage(url, serviceKey, mediaUrl, uid);
-    if (!sanitizedURL) return json({ error: "invalid attachment" }, 400);
-    mediaUrl = sanitizedURL;
-    mediaMime = "image/jpeg";
-    mediaName = mediaName.replace(/\.[^.]+$/, "") + ".jpg";
+    const attachment = await sanitizeStoredAttachment(url, serviceKey, mediaUrl, uid);
+    if (!attachment) return json({ error: "invalid attachment" }, 400);
+    mediaUrl = attachment.url;
+    mediaMime = attachment.mime;
+    mediaName = mediaName.replace(/[\x00-\x1f\x7f/\\]/g, "").slice(0, 160) || "attachment";
+    if (attachment.image) mediaName = mediaName.replace(/\.[^.]+$/, "") + ".jpg";
   }
 
   // 1. Persist the user's message. This is the source of truth the app reads.
   try {
     await restInsert(url, serviceKey, "support_messages", {
+      id: clientMessageId,
       user_id: uid,
       sender: "user",
       text,
       media_url: mediaUrl || null,
       media_mime: mediaMime || null,
       media_name: mediaName || null,
-    });
+    }, true);
   } catch {
     return json({ error: "message persistence failed" }, 502);
   }
@@ -95,15 +104,29 @@ Deno.serve(async (request: Request): Promise<Response> => {
   const name = (profile?.display_name as string) || "Aura user";
   const email = (profile?.email as string) || "";
 
-  // 2. Relay to Crisp. Best-effort: a Crisp hiccup must not fail the send.
+  // A retry with the same client UUID keeps one database row. If the earlier
+  // attempt reached Crisp, return success without posting it twice.
+  const persisted = await restSelectOne(
+    url, serviceKey,
+    `support_messages?id=eq.${clientMessageId}&user_id=eq.${uid}&select=crisp_relayed_at`,
+  ).catch(() => null);
+  if (!persisted) return json({ error: "message lookup failed" }, 502);
+  if (persisted.crisp_relayed_at) return json({ ok: true }, 200);
+
+  // 2. Relay to Crisp. New clients receive a failure and expose their existing
+  // retry button; the same UUID prevents that retry from duplicating the row.
   const crisp = crispCreds();
-  if (crisp) {
-    try {
-      const session = await ensureCrispSession(url, serviceKey, crisp, uid, name, email);
-      if (session) {
-        await crispSendUserMessage(crisp, session, { text, mediaUrl, mediaMime, mediaName }, name);
-      }
-    } catch (_e) { /* persisted; next send retries */ }
+  if (!crisp) return json({ error: "support relay unavailable" }, 502);
+  try {
+    const session = await ensureCrispSession(url, serviceKey, crisp, uid, name, email);
+    if (!session) throw new Error("Crisp session unavailable");
+    await crispSendUserMessage(crisp, session, { text, mediaUrl, mediaMime, mediaName }, name);
+    await restMarkCrispRelayed(url, serviceKey, clientMessageId, uid);
+  } catch (_e) {
+    // Old clients did not send a stable UUID, so returning a retryable error to
+    // them would create duplicates. New clients are safe to retry.
+    if (retryableClient) return json({ error: "support relay failed" }, 502);
+    return json({ ok: true, relay_pending: true }, 200);
   }
 
   // 3. Slack heads-up (notification only). Best-effort.
@@ -119,21 +142,20 @@ Deno.serve(async (request: Request): Promise<Response> => {
 
 /**
  * Downloads the authenticated user's object through a trusted Storage API URL,
- * re-encodes it to a capped
- * JPEG (dropping any EXIF/GPS and enforcing a max dimension), and overwrites the
- * same object in place. Returns false on any validation, download, decode, or
- * overwrite failure; the caller then rejects the message before persistence.
+ * validates its format, and re-encodes images as capped metadata-free JPEGs.
+ * Supported documents/audio retain their bytes. The trusted content type is
+ * written back before signing/relay; any failure rejects before persistence.
  */
-async function sanitizeStoredImage(
+async function sanitizeStoredAttachment(
   url: string, serviceKey: string, signedUrl: string, uid: string,
-): Promise<string | null> {
+): Promise<{ url: string; mime: string; image: boolean } | null> {
   try {
     const media = trustedSupportMedia(url, signedUrl, uid);
     if (!media) return null;
     const original = await fetchTrustedSupportMedia(media, serviceKey);
-    if (!rasterWithinPixelBudget(original)) return null;
-
-    const clean = await reencodeJpeg(original);
+    const kind = supportAttachmentKind(original, media.objectPath);
+    if (!kind) return null;
+    const clean = kind.image ? await reencodeJpeg(original) : original;
     if (!clean) return null;
 
     // Overwrite in place (same path) with the service role.
@@ -142,14 +164,14 @@ async function sanitizeStoredImage(
       headers: {
         authorization: `Bearer ${serviceKey}`,
         apikey: serviceKey,
-        "content-type": "image/jpeg",
+        "content-type": kind.mime,
         "x-upsert": "true",
       },
       body: clean,
       redirect: "error",
       signal: AbortSignal.timeout(5_000),
     });
-    return await createFreshSignedSupportURL(media, serviceKey);
+    return { url: await createFreshSignedSupportURL(media, serviceKey), ...kind };
   } catch {
     return null;
   }
@@ -201,7 +223,9 @@ async function ensureCrispSession(
   );
   if (existing?.session_id) return existing.session_id as string;
 
-  const created = await fetch(`${CRISP_API}/website/${c.websiteId}/conversation`, {
+  const created = await checkedFetch(
+    "Crisp conversation create",
+    `${CRISP_API}/website/${c.websiteId}/conversation`, {
     method: "POST",
     headers: crispHeaders(c),
     signal: AbortSignal.timeout(5_000),
@@ -251,7 +275,9 @@ async function crispSendUserMessage(
         },
       }
     : { ...base, type: "text", content: msg.text };
-  const r = await fetch(`${CRISP_API}/website/${c.websiteId}/conversation/${sessionId}/message`, {
+  const r = await checkedFetch(
+    "Crisp message relay",
+    `${CRISP_API}/website/${c.websiteId}/conversation/${sessionId}/message`, {
     method: "POST",
     headers: crispHeaders(c),
     body: JSON.stringify(payload),
@@ -299,6 +325,7 @@ async function verifyUser(jwt: string): Promise<string | null> {
 
 async function restInsert(
   url: string, key: string, table: string, row: Record<string, unknown>,
+  ignoreDuplicates = false,
 ): Promise<void> {
   await checkedFetch("support message insert", `${url}/rest/v1/${table}`, {
     method: "POST",
@@ -306,7 +333,7 @@ async function restInsert(
       apikey: key,
       authorization: `Bearer ${key}`,
       "content-type": "application/json",
-      prefer: "return=minimal",
+      prefer: ignoreDuplicates ? "resolution=ignore-duplicates,return=minimal" : "return=minimal",
     },
     signal: AbortSignal.timeout(5_000),
     body: JSON.stringify(row),
@@ -316,7 +343,7 @@ async function restInsert(
 async function restSelectOne(
   url: string, key: string, query: string,
 ): Promise<Record<string, unknown> | null> {
-  const r = await fetch(`${url}/rest/v1/${query}`, {
+  const r = await checkedFetch("support row select", `${url}/rest/v1/${query}`, {
     headers: {
       apikey: key,
       authorization: `Bearer ${key}`,
@@ -324,9 +351,31 @@ async function restSelectOne(
     },
     signal: AbortSignal.timeout(5_000),
   });
-  if (!r.ok) return null;
   const rows = await r.json();
   return Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+}
+
+async function restMarkCrispRelayed(
+  url: string, key: string, messageId: string, uid: string,
+): Promise<void> {
+  await checkedFetch(
+    "support relay marker update",
+    `${url}/rest/v1/support_messages?id=eq.${messageId}&user_id=eq.${uid}`, {
+      method: "PATCH",
+      headers: {
+        apikey: key,
+        authorization: `Bearer ${key}`,
+        "content-type": "application/json",
+        prefer: "return=minimal",
+      },
+      signal: AbortSignal.timeout(5_000),
+      body: JSON.stringify({ crisp_relayed_at: new Date().toISOString() }),
+    },
+  );
+}
+
+function isUUID(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(value);
 }
 
 function json(body: unknown, status: number): Response {

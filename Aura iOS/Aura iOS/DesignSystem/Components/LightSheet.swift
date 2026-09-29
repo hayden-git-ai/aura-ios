@@ -10,6 +10,30 @@ import SwiftUI
 /// design system. Mirrors the values first established on the Store/Blocks
 /// sheets.
 enum LightSheet {
+    /// Solid upper field sampled from the approved Healthy Habits halftone art.
+    static let healthyHabitsMint = Color(hex: "6AEDC2")
+    static let healthyHabitsMintHeaderTop = Color(hex: "50D9AE")
+    static let healthyHabitsMintWash = Color(hex: "DDFBEF")
+    static let healthyHabitsReward = Color(hex: "104C3E")
+    /// Full-color achievement widgets, matched to the approved visual reference.
+    enum Achievement {
+        static let numeralShadowOpacity: Double = 0.18
+        static let numeralShadowRadius: CGFloat = 2
+        static let numeralShadowDrop: CGFloat = 1
+        static let labelEdgeWidth: CGFloat = 0.5
+        struct Palette {
+            let top: Color
+            let bottom: Color
+            let ink: Color
+        }
+        // Approved soft two-tone treatment, with moderately richer lower stops.
+        static let coins = Palette(top: Color(hex: "FFE68A"), bottom: Color(hex: "FFB923"), ink: Color(hex: "512400"))
+        static let streak = Palette(top: Color(hex: "FFD1AA"), bottom: Color(hex: "FF9B60"), ink: Color(hex: "692D17"))
+        static let habits = Palette(top: Color(hex: "C0EDD4"), bottom: Color(hex: "63CE99"), ink: Color(hex: "174D3A"))
+        static let reps = Palette(top: Color(hex: "C0E3FC"), bottom: Color(hex: "64B8F2"), ink: Color(hex: "173F69"))
+        static let focus = Palette(top: Color(hex: "C9D4FC"), bottom: Color(hex: "7892F1"), ink: Color(hex: "242268"))
+        static let saved = Palette(top: Color(hex: "F8DEE9"), bottom: Color(hex: "EBA4BF"), ink: Color(hex: "65283F"))
+    }
     /// The app-screen ground (Blocks, Stats, Profile) — a hair off white so the
     /// white cards on it read as raised.
     static let ground = Color(hex: "FAFAFA")
@@ -210,6 +234,12 @@ enum LightSheet {
     /// blue/orange/green set.
     static let healthPink = Color(hex: "FF61AD")
     static let healthRed = Color(hex: "FF2719")
+    /// Passive Income's quest colour. Apple Health's permission prompt keeps
+    /// its own pink; the earn method itself uses this gold everywhere else.
+    static let passiveIncomeGold = Color(hex: "FFB923")
+    static let passiveIncomeGoldWash = Color(hex: "FFF1B8")
+    static let passiveIncomeGoldShade = Color(hex: "D18A00")
+    static let healthPermissionPink = Color(hex: "FF3B5C")
     /// The brand blue at wash strength: tip panels, the store's receipt row,
     /// a method's soft accent, a selected tile. Four pale blues did this —
     /// #DCEBFF, #E4EDFF, #EAF3FF and a hand-written #DBE7FB — spanning 14
@@ -335,6 +365,10 @@ struct LightSegmentedPill: View {
     var onBlue: Bool = false
     /// The field's colour, used for the selected pill's label when `onBlue`.
     var onColor: Color = LightSheet.blue
+    var idleTextColor: Color? = nil
+    var selectedTextColor: Color? = nil
+    var selectedFillColor: Color? = nil
+    var trackFillColor: Color? = nil
 
     var body: some View {
         HStack(spacing: 0) {
@@ -348,13 +382,16 @@ struct LightSegmentedPill: View {
                     // the whole label under. Selection is carried by the white
                     // pill, which is unmissable without help from the label.
                     .foregroundStyle(onBlue
-                        ? (selected ? onColor : .white)
+                        ? (selected ? (selectedTextColor ?? onColor) : (idleTextColor ?? .white))
                         : (selected ? .white : LightSheet.controlIdle))
                     .frame(maxWidth: .infinity)
                     .frame(height: height)
-                    .background { if selected { Capsule().fill(onBlue ? .white : LightSheet.blue) } }
+                    .background { if selected { Capsule().fill(selectedFillColor ?? (onBlue ? .white : LightSheet.blue)) } }
                     .contentShape(Capsule())
-                    .onTapGesture { withAnimation(.snappy(duration: 0.2)) { selection = index } }
+                    .onTapGesture {
+                        Haptics.selection()
+                        withAnimation(.snappy(duration: 0.2)) { selection = index }
+                    }
             }
         }
         .padding(4)
@@ -362,7 +399,7 @@ struct LightSegmentedPill: View {
         // summary panel below it: three translucent surfaces on the same field,
         // so they have to recede the same way. Lightening one of the three read
         // as a seam between them.
-        .background(onBlue ? LightSheet.surfaceOnColour : LightSheet.track, in: Capsule())
+        .background(trackFillColor ?? (onBlue ? LightSheet.surfaceOnColour : LightSheet.track), in: Capsule())
     }
 }
 
@@ -614,6 +651,12 @@ extension View {
     /// same height. This is for UI cards only; illustration depth is `foxShadow`
     /// / the sticker-shadow tokens, and text-on-photo legibility and
     /// sticker-outline depth are their own (heavier, purpose-specific) shadows.
+    /// Shared elevation for the colorful Apps lanes and achievement cards.
+    func illustratedCardShadow() -> some View {
+        shadow(color: .black.opacity(0.16), radius: 20, y: 11)
+            .shadow(color: .black.opacity(0.10), radius: 4, y: 2)
+    }
+
     func cardShadow() -> some View {
         shadow(color: .black.opacity(0.08), radius: 12, y: 4)
     }

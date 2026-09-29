@@ -14,7 +14,8 @@ import Foundation
 enum FontRegistration {
     static func registerBundledFonts() {
         let fontFiles = [
-            "Rubik-Variable"
+            "Rubik-Variable",
+            "LilitaOne-Regular"
         ]
 
         for name in fontFiles {

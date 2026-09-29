@@ -16,20 +16,20 @@ struct HabitSessionSheet: View {
 
     var body: some View {
         ZStack {
-            Theme.Color.background.ignoresSafeArea()
+            LightSheet.bg.ignoresSafeArea()
 
             HabitSessionTimerView(session: session, now: now,
                                   onTogglePause: onTogglePause, onEnd: onEnd)
                 .padding(.horizontal, Theme.Spacing.xl)
         }
         .presentationDetents([.height(560)])
-        .presentationDragIndicator(.visible)
-        .preferredColorScheme(.dark)
+        .presentationDragIndicator(.hidden)
+        .preferredColorScheme(.light)
     }
 }
 
 /// The ring timer for an active Photo Proof habit session — counts down "until
-/// apps unlock", with Pause/Resume and End controls.
+/// the session ends", with Pause/Resume and End controls.
 private struct HabitSessionTimerView: View {
     let session: ActiveHabitSession
     /// The store's clock. The session holds an end date now, so what's left is
@@ -46,64 +46,78 @@ private struct HabitSessionTimerView: View {
     }
 
     var body: some View {
-        VStack(spacing: Theme.Spacing.xxl) {
+        VStack(spacing: 0) {
+            LightDragCapsule()
+
             ring
+                .padding(.top, Theme.Spacing.xl)
+
+            Spacer(minLength: Theme.Spacing.xl)
 
             VStack(spacing: Theme.Spacing.m) {
-                Button(action: onTogglePause) {
+                Button {
+                    Haptics.impact(.light)
+                    onTogglePause()
+                } label: {
                     HStack(spacing: Theme.Spacing.s) {
                         Image(systemName: session.isPaused ? "play.fill" : "pause.fill")
                         Text(session.isPaused ? "Resume" : "Pause")
                     }
                     .font(SheetType.ctaFont)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(LightSheet.title)
                     .frame(maxWidth: .infinity)
                     .frame(height: 54)
-                    .glassEffect(.regular.interactive(), in: Capsule())
+                    .background(.white, in: Capsule())
+                    .bottomDrop(Capsule(), face: .white, shade: LightSheet.whiteShade)
                 }
                 .buttonStyle(.plain)
 
-                Button(action: onEnd) {
+                Button {
+                    Haptics.impact(.light)
+                    onEnd()
+                } label: {
                     HStack(spacing: Theme.Spacing.s) {
                         Image(systemName: "xmark")
                         Text("End")
                     }
                     .font(SheetType.ctaFont)
-                    .foregroundStyle(Theme.Color.signalWarning)
+                    .foregroundStyle(LightSheet.danger)
                     .frame(maxWidth: .infinity)
                     .frame(height: 54)
                     .background(
-                        Capsule().strokeBorder(Theme.Color.signalWarning.opacity(0.5), lineWidth: 1)
+                        Capsule().strokeBorder(LightSheet.danger.opacity(0.5), lineWidth: 1)
                     )
                 }
                 .buttonStyle(.plain)
             }
+            .padding(.bottom, Theme.Spacing.xl)
         }
+        .frame(maxHeight: .infinity)
     }
 
     private var ring: some View {
         ZStack {
             Circle()
-                .stroke(Color.white.opacity(0.12), lineWidth: 4)
+                .stroke(LightSheet.track, lineWidth: 4)
             Circle()
                 .trim(from: 0, to: progress)
-                .stroke(Color.white, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                .stroke(LightSheet.blue, style: StrokeStyle(lineWidth: 4, lineCap: .round))
                 .rotationEffect(.degrees(-90))
                 .animation(.linear(duration: 1), value: progress)
 
             VStack(spacing: Theme.Spacing.xs) {
                 Text(clock)
-                    .auraFont(.display, 46, .bold)
-                    .foregroundStyle(.white)
+                    .auraFont(.body, 46, .bold)
+                    .foregroundStyle(LightSheet.title)
                     .monospacedDigit()
                     .contentTransition(.numericText())
                 // Sentence case and untracked, like every other caption. This
                 // was the last all-caps label left after the stat row.
-                Text("Until apps unlocked")
+                Text("Until focus session ends")
                     .auraFont(.body, RowType.subLabel, .medium)
-                    .foregroundStyle(Theme.Color.textSecondary)
+                    .foregroundStyle(LightSheet.subtitle)
             }
         }
-        .frame(width: 240, height: 240)
+        .frame(width: 208, height: 208)
     }
 }

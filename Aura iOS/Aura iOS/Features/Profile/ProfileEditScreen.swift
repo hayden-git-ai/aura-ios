@@ -18,6 +18,7 @@ struct ProfileEditScreen: View {
 
     @State private var firstName = ""
     @State private var lastName = ""
+    @State private var nameError: String?
     /// Tapping the avatar opens Aura's own library picker.
     @State private var showLibraryPicker = false
 
@@ -38,7 +39,12 @@ struct ProfileEditScreen: View {
                         avatarSection
 
                         fieldBlock("First name", $firstName, placeholder: "Your first name", field: .first)
-                        fieldBlock("Last name", $lastName, placeholder: "Your last name", field: .last)
+                        fieldBlock("Last name (optional)", $lastName, placeholder: "Your last name", field: .last)
+                        if let nameError {
+                            Text(nameError)
+                                .auraFont(.body, SheetType.subtitle, .regular)
+                                .foregroundStyle(LightSheet.danger)
+                        }
                         readOnlyField("Email", value: store.email)
                     }
                     .padding(.horizontal, Theme.Spacing.xl)
@@ -65,9 +71,7 @@ struct ProfileEditScreen: View {
                 // The shared corner control: a chevron on the app's circular chrome
                 // disc, same as every other back/close button.
                 CircleIconButton(symbol: "chevron.left") {
-                    Haptics.impact(.light)
-                    save()
-                    dismiss()
+                    if save() { dismiss() }
                 }
                 Spacer()
             }
@@ -101,7 +105,7 @@ struct ProfileEditScreen: View {
                             .padding(3)
                     }
             }
-            .buttonStyle(PressBounceStyle())
+            .buttonStyle(PressBounceStyle(hapticsEnabled: false))
 
             if store.profileImageData != nil {
                 Button {
@@ -115,7 +119,7 @@ struct ProfileEditScreen: View {
                         .frame(minHeight: 44)
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(PressBounceStyle())
+                .buttonStyle(PressBounceStyle(hapticsEnabled: false))
             }
         }
         .frame(maxWidth: .infinity)
@@ -192,12 +196,23 @@ struct ProfileEditScreen: View {
         lastName = parts.count > 1 ? parts[1] : ""
     }
 
-    private func save() {
-        let name = [firstName, lastName]
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
-            .joined(separator: " ")
-        if !name.isEmpty { store.displayName = name }
+    private var canSaveName: Bool {
+        !ProfileIdentity.normalizedName(firstName).isEmpty &&
+        ProfileIdentity.isValidName("\(firstName) \(lastName)")
+    }
+
+    @discardableResult
+    private func save() -> Bool {
+        guard canSaveName else {
+            nameError = "Enter a name with at least two letters."
+            return false
+        }
+        guard store.saveProfileName(firstName: firstName, lastName: lastName) else {
+            nameError = "Your name couldn't be saved. Please try again."
+            return false
+        }
+        nameError = nil
+        return true
     }
 }
 

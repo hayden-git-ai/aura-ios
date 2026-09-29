@@ -14,9 +14,16 @@ import SwiftUI
 /// gesture swallows the Button's tap — so the tactile "bounce" comes from the
 /// button style instead, keeping the tap reliable.
 struct PressBounceStyle: ButtonStyle {
+    /// Baseline tactile response for interactive cards and icon controls. Turn
+    /// it off only when the action already owns a more specific haptic.
+    var hapticsEnabled = true
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
             .animation(.spring(response: 0.28, dampingFraction: 0.55), value: configuration.isPressed)
+            .onChange(of: configuration.isPressed) { _, pressed in
+                if pressed && hapticsEnabled { Haptics.impact(.light) }
+            }
     }
 }

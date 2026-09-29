@@ -217,6 +217,7 @@ struct InlineMediaGrid: View {
     }
 
     private func toggle(_ asset: PHAsset) {
+        Haptics.selection()
         if let i = selection.firstIndex(where: { $0.localIdentifier == asset.localIdentifier }) {
             selection.remove(at: i)
         } else {

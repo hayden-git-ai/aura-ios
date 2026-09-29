@@ -6,9 +6,8 @@
 import Foundation
 
 /// How hard an exercise is, which also picks its gem icon. Fox art per exercise
-/// proved too costly to draw, so the whole method now leans on three shared gems
-/// (emerald / ruby / diamond) keyed off difficulty — one icon per tier, and the
-/// picker's filter tabs read straight off this.
+/// proved too costly to draw, so the whole method now leans on two shared gems
+/// (emerald / diamond) keyed off the Easy / Hard split.
 enum ExerciseDifficulty: String, CaseIterable, Hashable {
     case easy, medium, hard
 
@@ -23,11 +22,12 @@ enum ExerciseDifficulty: String, CaseIterable, Hashable {
     /// Sort order for the list: easy at the top, hard at the bottom.
     var rank: Int { Self.allCases.firstIndex(of: self) ?? 0 }
 
-    /// The gem sticker for this tier — emerald, ruby, diamond.
+    /// Medium is retained for stored-data compatibility but now belongs to the
+    /// Hard presentation and uses the same diamond sticker.
     var iconAsset: String {
         switch self {
         case .easy: return "CameraRepsEasy"
-        case .medium: return "CameraRepsMedium"
+        case .medium: return "CameraRepsHard"
         case .hard: return "CameraRepsHard"
         }
     }
@@ -80,10 +80,10 @@ struct Exercise: Identifiable, Hashable {
     }
 
     static let all: [Exercise] = [
-        Exercise(id: "pushups", name: "Push-ups", iconSystemName: "figure.strengthtraining.traditional", difficulty: .medium, unitsToStartEarning: 5, defaultMinutesPerUnit: 1.0, formTip: "Phone on the floor a few feet away. I need your head and hips in frame."),
+        Exercise(id: "pushups", name: "Push-ups", iconSystemName: "figure.strengthtraining.traditional", difficulty: .hard, unitsToStartEarning: 5, defaultMinutesPerUnit: 1.0, formTip: "Phone on the floor a few feet away. I need your head and hips in frame."),
         Exercise(id: "squats", name: "Squats", iconSystemName: "figure.cross.training", difficulty: .easy, unitsToStartEarning: 5, defaultMinutesPerUnit: 1.0, formTip: "Back up till you fit. A rep lands when you stand up."),
         Exercise(id: "situps", name: "Sit-ups", iconSystemName: "figure.core.training", difficulty: .hard, unitsToStartEarning: 5, defaultMinutesPerUnit: 1.0, formTip: "Phone on the floor beside you, tilted up. Shoulders and knees in frame."),
         Exercise(id: "jumpingjacks", name: "Jumping Jacks", iconSystemName: "figure.mixed.cardio", difficulty: .easy, unitsToStartEarning: 10, defaultMinutesPerUnit: 1.0, formTip: "Back up further than feels necessary. Arms have to stay in frame."),
-        Exercise(id: "lunges", name: "Lunges", iconSystemName: "figure.strengthtraining.functional", difficulty: .medium, unitsToStartEarning: 5, defaultMinutesPerUnit: 1.0, formTip: "A few steps back. Both legs stay in frame the whole way down."),
+        Exercise(id: "lunges", name: "Lunges", iconSystemName: "figure.strengthtraining.functional", difficulty: .hard, unitsToStartEarning: 5, defaultMinutesPerUnit: 1.0, formTip: "A few steps back. Both legs stay in frame the whole way down."),
     ]
 }

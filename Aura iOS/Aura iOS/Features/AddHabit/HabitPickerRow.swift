@@ -55,7 +55,193 @@ struct HabitPickerRow<Icon: View>: View {
         .bottomDropCard(radius: Theme.Radius.card, shade: LightSheet.whiteShadeOnColour)
         // The row opens the habit; the heart keeps its own hit area inside it.
         .contentShape(RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous))
-        .onTapGesture(perform: onTap)
+        .onTapGesture {
+            Haptics.impact(.light)
+            onTap()
+        }
+    }
+}
+
+/// Compact collectible-style tile used by the Healthy Habits Focus / Quick
+/// grids. The decorative background is raster art; title, sticker, reward,
+/// favourite state, and all interactions stay native and accessible.
+struct HabitPickerCard<Icon: View>: View {
+    let title: String
+    let rate: String
+    let isFavorite: Bool
+    var backgroundAsset = "HealthyHabitCardBackground"
+    var rewardColor = LightSheet.healthyHabitsReward
+    var popTrigger: Int = 0
+    var onTap: () -> Void
+    var onFavorite: () -> Void
+    @ViewBuilder var icon: Icon
+
+    private let radius: CGFloat = 14
+    private let cardHeight: CGFloat = 108
+    private let rewardWidth: CGFloat = 114
+
+    /// Matches the Home coin's sparkle geometry, scaled from its 56pt coin to
+    /// this card's 31pt coin so both stars straddle the rim identically.
+    private enum CoinSparkles {
+        static var topSize: CGFloat { 17 * 31 / 56 }
+        static var topX: CGFloat { 44.64 * 31 / 56 }
+        static var topY: CGFloat { 12.24 * 31 / 56 }
+        static var bottomSize: CGFloat { 11 * 31 / 56 }
+        static var bottomX: CGFloat { 10.13 * 31 / 56 }
+        static var bottomY: CGFloat { 43.05 * 31 / 56 }
+    }
+
+    var body: some View {
+        ZStack(alignment: .trailing) {
+            Image(backgroundAsset)
+                .resizable()
+                .interpolation(.high)
+                .scaledToFill()
+                .frame(maxWidth: .infinity, minHeight: cardHeight, maxHeight: cardHeight)
+                .clipped()
+
+            HStack(spacing: 5) {
+                ZStack {
+                    Ellipse()
+                        .fill(Color.white.opacity(0.20))
+                        .frame(width: 124, height: 98)
+                        .blur(radius: 12)
+
+                    Ellipse()
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    Color.white.opacity(0.48),
+                                    Color.white.opacity(0.22),
+                                    Color.white.opacity(0.02)
+                                ],
+                                center: .center,
+                                startRadius: 1,
+                                endRadius: 48
+                            )
+                        )
+                        .frame(width: 106, height: 82)
+
+                    icon
+                        .frame(maxWidth: 82, maxHeight: 78)
+                        .clipped()
+                }
+                .frame(width: 100, height: 92)
+
+                HabitOutlinedTitle(text: title)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .offset(y: -17)
+            }
+            .padding(.leading, 8)
+            .padding(.trailing, rewardWidth + 6)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+
+            HorizontalRewardPanelShape()
+                .fill(rewardColor)
+                .frame(width: rewardWidth, height: cardHeight)
+
+            HStack(spacing: 6) {
+                Image("AuraCoinIcon")
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFit()
+                    .frame(width: 31, height: 31)
+                    .overlay {
+                        ZStack {
+                            IceSparkle(size: CoinSparkles.topSize, delay: 0.0)
+                                .position(x: CoinSparkles.topX, y: CoinSparkles.topY)
+                            IceSparkle(size: CoinSparkles.bottomSize, delay: 0.8)
+                                .position(x: CoinSparkles.bottomX, y: CoinSparkles.bottomY)
+                        }
+                        .frame(width: 31, height: 31)
+                    }
+
+                Text(rate)
+                    .auraFont(.display, 17, .bold)
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.62)
+            }
+            .frame(width: rewardWidth - 8, height: cardHeight)
+            .padding(.leading, 8)
+
+            FavoriteHeart(
+                isOn: isFavorite,
+                action: onFavorite,
+                popTrigger: popTrigger,
+                idleTint: .white
+            )
+            .scaleEffect(1.14)
+            .frame(width: 48, height: 48)
+            .padding(.trailing, rewardWidth + 1)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+        }
+        .frame(height: cardHeight)
+        .clipShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: radius, style: .continuous)
+                .stroke(.white, lineWidth: 3)
+        }
+        .shadow(color: Color.black.opacity(0.20), radius: 8, x: 0, y: 4)
+        .contentShape(RoundedRectangle(cornerRadius: radius, style: .continuous))
+        .onTapGesture {
+            Haptics.impact(.light)
+            onTap()
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(title), earns \(rate)")
+    }
+}
+
+/// The Earn-card title treatment adapted for multiline habit names: black
+/// Lilita One lettering with the same clean white sticker outline.
+private struct HabitOutlinedTitle: View {
+    let text: String
+
+    private let outlineWidth: CGFloat = 1.6
+    private let directions: [(CGFloat, CGFloat)] = [
+        (-1, -1), (0, -1), (1, -1),
+        (-1, 0),            (1, 0),
+        (-1, 1),  (0, 1),  (1, 1)
+    ]
+
+    var body: some View {
+        ZStack(alignment: .leading) {
+            ForEach(directions.indices, id: \.self) { index in
+                titleText
+                    .foregroundStyle(.white)
+                    .offset(x: directions[index].0 * outlineWidth,
+                            y: directions[index].1 * outlineWidth)
+            }
+
+            titleText
+                .foregroundStyle(.black)
+        }
+        .shadow(color: .black.opacity(LightSheet.Achievement.numeralShadowOpacity),
+                radius: LightSheet.Achievement.numeralShadowRadius,
+                y: LightSheet.Achievement.numeralShadowDrop)
+    }
+
+    private var titleText: some View {
+        Text(text)
+            .auraFont(.display, 18, .bold)
+            .lineLimit(2)
+            .minimumScaleFactor(0.78)
+            .multilineTextAlignment(.leading)
+    }
+}
+
+/// Gives the reward area the strong, angled division used by game event rows
+/// while the card itself keeps a simple rounded silhouette.
+private struct HorizontalRewardPanelShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: 18, y: 0))
+        path.addLine(to: CGPoint(x: rect.maxX, y: 0))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: 0, y: rect.maxY))
+        path.closeSubpath()
+        return path
     }
 }
 
@@ -195,24 +381,18 @@ struct CreateHabitButton: View {
     var color: Color = LightSheet.blue
     var action: () -> Void
 
+    private let diameter: CGFloat = 68
+
     var body: some View {
-        Button(action: action) {
-            Image(systemName: "plus")
-                .font(.system(size: 26, weight: .bold))
-                .foregroundStyle(LightSheet.blue)
-                .frame(width: 62, height: 62)
-                // The app's off-white ground, not pure white.
-                .background(LightSheet.ground, in: Circle())
-                .shadow(color: .black.opacity(0.16), radius: 14, y: 6)
-                // Tap stays the disc — the halo behind it is decoration.
+        Button {
+            Haptics.impact(.light)
+            action()
+        } label: {
+            WoodButtonArtwork(role: .add, diameter: diameter)
+                .frame(width: diameter, height: diameter)
                 .contentShape(Circle())
-                // A capsule behind the plus — the nav bar's highlight shape —
-                // wider than it is tall, so the ends round off while the top and
-                // bottom stay near-straight. Same translucent material as before.
-                .padding(.horizontal, Theme.Spacing.l)
                 .padding(.vertical, Theme.Spacing.s)
-                .background(Capsule().fill(.black.opacity(0.12)))
         }
-        .buttonStyle(PressBounceStyle())
+        .buttonStyle(PressBounceStyle(hapticsEnabled: false))
     }
 }

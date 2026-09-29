@@ -147,10 +147,18 @@ struct AppGate: View {
         }
         onboarding.onFinish = {
             guard !store.accountPersistenceFailed else { return }
+            // The launch onboarding already collects the user's name. Persist it
+            // as the profile identity so completion goes straight to setup/app.
+            if ProfileIdentity.isValidName(onboarding.name) {
+                _ = store.saveProfileName(firstName: onboarding.name, lastName: "")
+                setup.pendingOnboardingName = ProfileIdentity.normalizedName(onboarding.name)
+            }
             withAnimation(.easeInOut(duration: 0.35)) { onboardingDone = true }
         }
-        setup.onFinish = {
+        setup.onFinish = { selection in
             guard !store.accountPersistenceFailed else { return }
+            store.setSelection(selection, rule: .distracting)
+            setup.pendingOnboardingName = nil
             withAnimation(.easeInOut(duration: 0.35)) { setupDone = true }
         }
 
@@ -216,7 +224,7 @@ struct AppGate: View {
         if checkingReturningAccount { return HomeDaylight.isDay(date) ? .light : .dark }
         guard isShowingSetup else { return .light }
         switch setup.step {
-        case .welcome, .allSet: return HomeDaylight.isDay(date) ? .light : .dark
+        case .allSet: return HomeDaylight.isDay(date) ? .light : .dark
         default: return .light
         }
     }

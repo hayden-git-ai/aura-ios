@@ -100,7 +100,7 @@ struct OnbCustomPlanView: View {
                 .padding(.top, 2)
 
             Text(planDate)
-                .auraFont(.display, SheetType.cta, .heavy)
+                .auraFont(.body, SheetType.cta, .heavy)
                 .foregroundStyle(LightSheet.blue)
                 .padding(.horizontal, Theme.Spacing.l)
                 .padding(.vertical, Theme.Spacing.s)
@@ -590,7 +590,7 @@ private struct OnbReviewCard: View {
     var body: some View {
         VStack(spacing: Theme.Spacing.s) {
             Text(name)
-                .auraFont(.display, SheetType.cardTitle, .bold)
+                .auraFont(.body, SheetType.cardTitle, .bold)
                 .foregroundStyle(LightSheet.title)
             Text(quote)
                 .auraFont(.body, SheetType.cardTitle, .medium)

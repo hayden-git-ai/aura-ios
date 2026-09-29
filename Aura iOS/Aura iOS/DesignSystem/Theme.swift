@@ -56,6 +56,7 @@ enum Theme {
         /// already says how close you are; the colour was saying it twice and
         /// was the only reason there was a problem to solve.
         static let earnBar = signalGain
+        static let earnTrack = SwiftUI.Color.black.opacity(0.45)
 
         /// Reserved for qualitative "good" judgments on the Insights sheet's
         /// usage-pattern rows (e.g. "Great" / "OK") — never a generic accent.

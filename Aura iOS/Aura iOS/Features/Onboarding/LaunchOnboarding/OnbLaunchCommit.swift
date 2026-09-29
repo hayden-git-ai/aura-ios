@@ -47,7 +47,14 @@ struct OnbLaunchCommit: View {
                     }
                     .offset(y: 72)
 
-                    LoopingVideoView(resource: "LockInFox")
+                    // Keep the commitment moment calm and deterministic in the
+                    // launch flow. The full flow may use motion, but launch uses
+                    // the approved static Aura sticker so this screen never
+                    // starts an animated media loop.
+                    Image("FoxLockInHero")
+                        .resizable()
+                        .interpolation(.high)
+                        .scaledToFit()
                         .frame(height: 200)
                         // The same soft contact shadow the other onboarding foxes carry.
                         .background(alignment: .bottom) {

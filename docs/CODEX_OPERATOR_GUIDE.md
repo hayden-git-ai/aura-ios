@@ -33,12 +33,13 @@ Use this as a starting policy, then improve it from measured results.
 
 | Work | Recommended starting point |
 | --- | --- |
-| Tiny copy, spacing, naming, or one-file mechanical edit | Luna low, Terra low, or Astra low directly |
-| Normal feature implementation or focused bug fix | Terra medium or Sol medium |
-| Cross-file implementation, difficult debugging, or independent code review | Sol high or Astra medium |
-| Architecture, orchestration, launch-critical diagnosis, security, purchases, signing, or conflicting requirements | Astra medium or high |
+| Tiny copy, spacing, naming, or one-file mechanical edit | Luna low; coordinator directly when delegation adds overhead |
+| Normal feature implementation or focused bug fix | Luna medium |
+| Cross-file implementation or independent code review | Luna medium with bounded scope; Astra medium for unresolved risk |
+| Orchestration | Astra low |
+| Launch-critical diagnosis, security, purchases, signing, or conflicting requirements | Luna gathers evidence; Astra medium reviews consequential decisions |
 | Exceptional unresolved problem after evidence-based attempts | Astra xhigh; use max or ultra only with a stated reason |
-| Fast repository search, inventory, or mechanical comparison | Spark low or medium |
+| Fast repository search, inventory, or mechanical comparison | Luna low |
 
 Reasoning effort should follow uncertainty and consequences:
 
@@ -69,6 +70,11 @@ Keep work with the orchestrator when:
 
 The orchestrator owns the final diff, resolves conflicts, runs verification, and
 produces the handoff. Subagent output is evidence, not automatically accepted.
+
+For the current full physical-device pass, use `DEVICE_EXECUTION_PLAN.md`.
+Agents execute all supported on-device actions; Hayden only supplies physical
+actions or unavailable controls. Keep a single device operator and build owner,
+and at most three concurrent workers. Follow AGENTS.md's documentation budgets.
 
 ## The Best Prompt Shape
 

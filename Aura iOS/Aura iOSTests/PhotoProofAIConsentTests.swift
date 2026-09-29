@@ -39,8 +39,16 @@ final class PhotoProofAIConsentTests: XCTestCase {
         XCTAssertFalse(PhotoProofAIConsent.isGranted(for: UUID(), defaults: defaults))
     }
 
-    func testDisclosureNamesBothPossibleVerificationProviders() {
-        XCTAssertTrue(PhotoProofAIConsent.disclosure.contains("Google Gemini"))
-        XCTAssertTrue(PhotoProofAIConsent.disclosure.contains("OpenAI"))
+    func testRevocationPersistsAndDoesNotRevokeAnotherAccount() {
+        let user = UUID()
+        let otherUser = UUID()
+        PhotoProofAIConsent.grant(for: user, defaults: defaults)
+        PhotoProofAIConsent.grant(for: otherUser, defaults: defaults)
+
+        PhotoProofAIConsent.revoke(for: user, defaults: defaults)
+
+        let reloaded = UserDefaults(suiteName: suiteName)!
+        XCTAssertFalse(PhotoProofAIConsent.isGranted(for: user, defaults: reloaded))
+        XCTAssertTrue(PhotoProofAIConsent.isGranted(for: otherUser, defaults: reloaded))
     }
 }

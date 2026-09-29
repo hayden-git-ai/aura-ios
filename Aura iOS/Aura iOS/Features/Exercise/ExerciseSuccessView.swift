@@ -57,7 +57,7 @@ struct ExerciseSuccessView: View {
                              value: "\(reps)", label: "Reps done")
                 EarnStatTile(icon: { EarnTileIcon(asset: "EarnCardIcon") },
                              value: "+\(coins)", label: "Coins earned")
-                EarnStatTile(icon: { EarnTileIcon(asset: "StreakFireIcon") },
+                EarnStatTile(icon: { EarnTileIcon(asset: "StreakFlame") },
                              value: "\(store.streak.currentStreak)", label: "Day streak")
             }
             .fixedSize(horizontal: false, vertical: true)

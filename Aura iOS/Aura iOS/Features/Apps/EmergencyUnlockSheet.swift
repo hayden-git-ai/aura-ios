@@ -106,11 +106,9 @@ struct EmergencyUnlockSheet: View {
         Button {
             dismiss()
         } label: {
-            Image(systemName: "xmark")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(.white)
+            WoodButtonArtwork(role: .close)
                 .frame(width: 44, height: 44)
-                .glassEffect(.regular.interactive(), in: Circle())
+                .contentShape(Circle())
         }
         .buttonStyle(.plain)
     }

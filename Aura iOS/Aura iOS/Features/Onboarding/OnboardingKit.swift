@@ -64,15 +64,9 @@ struct OnbTopBar: View {
             // run full width on screens that don't allow going back.
             if showBack {
                 Button { flow.back() } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 17, weight: .bold))
-                        .foregroundStyle(onSky ? Color.white : LightSheet.title)
-                        .frame(width: 40, height: 40)
-                        .background(onSky ? Color.black.opacity(0.16) : Color.black.opacity(0.06), in: Circle())
-                        // Visual disc stays 40pt; the hit area is padded out to
-                        // Apple's 44pt minimum.
+                    WoodButtonArtwork(role: .back)
                         .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
+                        .contentShape(Circle())
                 }
                 .buttonStyle(PressBounceStyle())
             }

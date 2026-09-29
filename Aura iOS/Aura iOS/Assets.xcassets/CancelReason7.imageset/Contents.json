@@ -1,6 +1,12 @@
 {
-  "images" : [
-    { "filename" : "CancelReason7.png", "idiom" : "universal" }
+  "images": [
+    {
+      "filename": "CancelReason7.png",
+      "idiom": "universal"
+    }
   ],
-  "info" : { "author" : "xcode", "version" : 1 }
+  "info": {
+    "author": "xcode",
+    "version": 1
+  }
 }

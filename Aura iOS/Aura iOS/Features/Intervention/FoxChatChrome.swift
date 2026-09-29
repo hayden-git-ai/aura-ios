@@ -73,12 +73,9 @@ struct FoxChatBackButton: View {
     let action: () -> Void
     var body: some View {
         Button(action: action) {
-            Image(systemName: "chevron.left")
-                .font(.system(size: 17, weight: .bold))
-                .foregroundStyle(.white)
-                .frame(width: 40, height: 40)
-                .background { foxChatGlass(Circle()) }
-                .overlay(Circle().strokeBorder(Color.white.opacity(0.18), lineWidth: 1))
+            WoodButtonArtwork(role: .back)
+                .frame(width: 44, height: 44)
+                .contentShape(Circle())
         }
         .buttonStyle(PressBounceStyle())
     }

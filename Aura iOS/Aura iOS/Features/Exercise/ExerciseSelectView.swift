@@ -157,7 +157,7 @@ struct ExerciseSelectView: View {
             goalStepButton(systemImage: "minus") { store.setGoal(value - step, for: selected) }
 
             Text(Exercise.goalDisplay(value))
-                .auraFont(.display, 28, .bold)
+                .auraFont(.body, 28, .bold)
                 .foregroundStyle(.white)
                 .frame(minWidth: 120)
                 .monospacedDigit()

@@ -169,14 +169,12 @@ struct ExerciseCameraView: View {
                     // Asking somebody who did zero reps whether they're sure is
                     // a dialog for the sake of having one.
                     guard units > 0 else { onClose(); return }
-                    Haptics.impact(.light)
                     withAnimation(.snappy(duration: 0.25)) { showLeaveConfirm = true }
                 }
                     .photoHalo()
                 Spacer()
                 CircleIconButton(sticker: "FoxSettingsHelp",
                                  fill: LightSheet.chromeOnPhoto) {
-                    Haptics.impact(.light)
                     showHelp = true
                 }
                 .photoHalo()
@@ -245,7 +243,7 @@ struct ExerciseCameraView: View {
     private var countBlock: some View {
         VStack(spacing: -Theme.Spacing.s) {
             Text("\(units)")
-                .auraFont(.display, Self.countSize, .bold)
+                .auraFont(.body, Self.countSize, .bold)
                 .foregroundStyle(.white)
                 .monospacedDigit()
                 .contentTransition(.numericText())
@@ -303,6 +301,7 @@ struct ExerciseCameraView: View {
             Color.black.opacity(0.55)
                 .ignoresSafeArea()
                 .onTapGesture {
+                    Haptics.impact(.light)
                     withAnimation(.snappy(duration: 0.2)) { showLeaveConfirm = false }
                 }
 

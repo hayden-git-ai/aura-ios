@@ -32,9 +32,17 @@ struct AppleHealthView: View {
                 connectPrompt
             }
         }
-        .background(MethodScreenBackground(
-            height: MethodScreenBackground.heroCentred(stickerHeight: HabitCategory.healthSync.heroHeight),
-            color: HabitCategory.healthSync.accent))
+        .background {
+            if store.isHealthConnected {
+                EarnMethodIllustratedBackground()
+            } else {
+                MethodScreenBackground(
+                    height: MethodScreenBackground.heroCentred(
+                        stickerHeight: HabitCategory.healthSync.heroHeight),
+                    color: LightSheet.healthPermissionPink
+                )
+            }
+        }
         .preferredColorScheme(.light)
         .overlay(alignment: .top) { toast }
         // Health totals only ever grow through the day, so the sheet reads them
@@ -51,10 +59,8 @@ struct AppleHealthView: View {
             set: { if $0 == nil { collected = nil } }
         )) { payout in
             SunburstSuccessView(
-                // The light pink-red answer to the streak sunburst's peach —
-                // Passive Income's own hue.
-                rayLighter: Color(hex: "FFDCE3"),
-                rayDarker: Color(hex: "FFC3CF"),
+                rayLighter: LightSheet.passiveIncomeGoldWash,
+                rayDarker: Color(hex: "FFE083"),
                 iconCentre: 0.26,
                 artHalfHeight: 124,
                 art: { SuccessCelebrationArt() },
@@ -74,7 +80,7 @@ struct AppleHealthView: View {
                                          value: "\(store.healthCollectCount)", label: "Times collected")
                             EarnStatTile(icon: { EarnTileIcon(asset: "EarnCardIcon") },
                                          value: "+\(payout.amount)", label: "Coins earned")
-                            EarnStatTile(icon: { EarnTileIcon(asset: "StreakFireIcon") },
+                            EarnStatTile(icon: { EarnTileIcon(asset: "StreakFlame") },
                                          value: "\(store.streak.currentStreak)", label: "Day streak")
                         }
                         .fixedSize(horizontal: false, vertical: true)
@@ -86,7 +92,7 @@ struct AppleHealthView: View {
                 )
             ) {
                 collected = nil
-                if collectedWasFirstToday { showStreak = true } else { dismiss() }
+                if collectedWasFirstToday { showStreak = true }
             }
         }
         .fullScreenCover(isPresented: $showStreak) {
@@ -96,7 +102,7 @@ struct AppleHealthView: View {
             StreakCelebrationView(
                 currentStreak: store.streak.currentStreak,
                 buttonTitle: "Let's go!",
-                onButton: { dismiss() }
+                onButton: { showStreak = false }
             )
         }
     }
@@ -106,19 +112,10 @@ struct AppleHealthView: View {
 
     private var connected: some View {
         VStack(spacing: 0) {
+            methodHeader
+
             ScrollView {
                 VStack(alignment: .leading, spacing: Theme.Spacing.xl) {
-                    FocusHero(
-                        sticker: HabitCategory.healthSync.heroIconAsset,
-                        title: "Passive Income",
-                        subtitle: "Your steps are secretly stacking coins!",
-                        stickerHeight: HabitCategory.healthSync.heroHeight,
-                        titleColor: .white,
-                        subtitleColor: LightSheet.onColour,
-                        titleGap: 0
-                    )
-                    .frame(maxWidth: .infinity)
-
                     VStack(alignment: .leading, spacing: Theme.Spacing.m) {
                         connectedRow
                         metricList
@@ -126,64 +123,33 @@ struct AppleHealthView: View {
                     footer
                 }
                 .padding(.horizontal, Theme.Spacing.xl)
-                .padding(.top, Theme.Spacing.s)
+                .padding(.top, Theme.Spacing.xxl)
                 .padding(.bottom, Theme.Spacing.xl)
             }
 
-            collectButton
-                .padding(.horizontal, Theme.Spacing.xl)
-                .padding(.top, Theme.Spacing.s)
-                .padding(.bottom, Theme.Spacing.xl)
         }
         .overlay(alignment: .topLeading) {
-            CircleIconButton(symbol: "xmark", glyphColor: LightSheet.subtitleDark, bounces: false) { dismiss() }
+            CircleIconButton(symbol: "xmark", fill: LightSheet.chromeOnBlue,
+                             glyphColor: .white, bounces: false) {
+                dismiss()
+            }
                 .padding(.leading, Theme.Spacing.xl)
                 .padding(.top, Theme.Spacing.l)
         }
         .overlay(alignment: .topTrailing) {
-            ExplainerButton(explainer: QuestExplainer.passiveIncome)
+            ExplainerButton(explainer: QuestExplainer.passiveIncome, onBlue: true)
                 .padding(.trailing, Theme.Spacing.xl)
                 .padding(.top, Theme.Spacing.l)
         }
     }
 
-    /// Total collectable screen-time minutes across all metrics with activity.
-    private var pendingTotal: Int {
-        store.healthMetrics.reduce(0) { $0 + ($1.hasActivity ? $1.pendingMinutes : 0) }
-    }
-
-    /// The primary collect button — "Collect 🪙 N", styled like the Screen Time
-    /// store's buy button.
-    private var collectButton: some View {
-        Button { collectAll() } label: {
-            HStack(spacing: Theme.Spacing.s) {
-                if pendingTotal > 0 {
-                    Text("Collect")
-                        .font(SheetType.ctaFont)
-                        .foregroundStyle(HabitCategory.healthSync.accent)
-                    Image("AuraCoinIcon")
-                        .resizable()
-                        .interpolation(.high)
-                        .scaledToFit()
-                        .frame(width: 20, height: 20)
-                    Text("\(pendingTotal)")
-                        .font(SheetType.ctaFont)
-                        .foregroundStyle(HabitCategory.healthSync.accent)
-                        .monospacedDigit()
-                        .contentTransition(.numericText())
-                } else {
-                    Text("Nothing to Collect")
-                        .font(SheetType.ctaFont)
-                        .foregroundStyle(HabitCategory.healthSync.accent)
-                }
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: 56)
-            .whiteDropCapsule(depth: 5, shade: LightSheet.whiteShadeOnColour)
-            .opacity(pendingTotal > 0 ? 1 : 0.45)
+    private var methodHeader: some View {
+        EarnMethodIllustratedHeader {
+            EarnMethodRewardRibbon(
+                asset: "PassiveIncomeRewardRibbon",
+                accessibilityLabel: "Live life, Earn coins!"
+            )
         }
-        .buttonStyle(.plain)
-        .disabled(pendingTotal == 0)
     }
 
     /// The connected badge — a pulsing dot and the status text.
@@ -200,7 +166,7 @@ struct AppleHealthView: View {
                 }
             Text("Connected to Apple Health")
                 .auraFont(.body, RowType.label, .bold)
-                .foregroundStyle(.white)
+                .foregroundStyle(LightSheet.title)
 
             Spacer(minLength: Theme.Spacing.s)
 
@@ -223,7 +189,7 @@ struct AppleHealthView: View {
                 // Same glyph sequence as the Blocks explainer's Reload Aura —
                 // arrow, spinner, tick — so a reload looks the same wherever
                 // it is.
-                ReloadGlyph(phase: reloadPhase, tint: .white)
+                ReloadGlyph(phase: reloadPhase, tint: LightSheet.title)
                     .frame(width: CircleIconButton.minimumTarget,
                            height: CircleIconButton.minimumTarget,
                            alignment: .trailing)
@@ -242,49 +208,60 @@ struct AppleHealthView: View {
         }
     }
 
-    /// The Apple Health heart's pink→red gradient, reused for the metric glyphs.
+    /// Gold fallback for metrics that do not have a Figma sticker.
     private var healthGradient: LinearGradient {
         LinearGradient(
-            colors: [LightSheet.healthPink, LightSheet.healthRed],
+            colors: [Color(hex: "FFD865"), LightSheet.passiveIncomeGold],
             startPoint: .top, endPoint: .bottom
         )
     }
 
     private func metricRow(_ metric: HealthMetric) -> some View {
         let active = metric.hasActivity && metric.pendingMinutes > 0
-        return HStack(spacing: Theme.Spacing.m) {
-            metricGlyph(metric)
-                .frame(width: 52, height: 52)
+        return Button {
+            collect(metric)
+        } label: {
+            HStack(spacing: Theme.Spacing.m) {
+                metricGlyph(metric)
+                    .frame(width: 56, height: 56)
 
-            VStack(alignment: .leading, spacing: RowType.labelGap) {
-                Text(metric.name)
-                    .auraFont(.body, RowType.label, .semibold)
-                    .foregroundStyle(RowType.labelColor)
-                HStack(spacing: 4) {
-                    Image("AuraCoinIcon")
-                        .resizable()
-                        .interpolation(.high)
-                        .scaledToFit()
-                        .frame(width: 14, height: 14)
-                    Text(metric.rateLabel.replacingOccurrences(of: " min / ", with: "/"))
-                        .auraFont(.body, RowType.subLabel, .medium)
-                        .foregroundStyle(LightSheet.subtitle)
+                VStack(alignment: .leading, spacing: RowType.labelGap) {
+                    Text(metric.name)
+                        .auraFont(.body, RowType.label, .semibold)
+                        .foregroundStyle(RowType.labelColor)
+                    HStack(spacing: 4) {
+                        Image("AuraCoinIcon")
+                            .resizable()
+                            .interpolation(.high)
+                            .scaledToFit()
+                            .frame(width: 14, height: 14)
+                        Text(metric.rateLabel.replacingOccurrences(of: " min / ", with: "/"))
+                            .auraFont(.body, RowType.subLabel, .medium)
+                            .foregroundStyle(LightSheet.subtitle)
+                    }
+                }
+
+                Spacer(minLength: Theme.Spacing.s)
+
+                if active {
+                    VStack(spacing: 2) {
+                        Text("Collect")
+                            .auraFont(.body, RowType.subLabel, .bold)
+                            .foregroundStyle(LightSheet.passiveIncomeGoldShade)
+                        CoinBadge(text: "\(metric.pendingMinutes)")
+                    }
+                } else {
+                    Text("No activity")
+                        .auraFont(.body, RowType.value, .medium)
+                        .foregroundStyle(RowType.valueColor)
                 }
             }
-
-            Spacer(minLength: Theme.Spacing.s)
-
-            if active {
-                CoinBadge(text: "\(metric.pendingMinutes)")
-            } else {
-                Text("No activity")
-                    .auraFont(.body, RowType.value, .medium)
-                    .foregroundStyle(RowType.valueColor)
-            }
+            .padding(.horizontal, Theme.Spacing.m)
+            .padding(.vertical, Theme.Spacing.s)
+            .bottomDropCard(radius: Theme.Radius.card, shade: LightSheet.whiteShadeOnColour)
         }
-        .padding(.horizontal, Theme.Spacing.m)
-        .padding(.vertical, Theme.Spacing.s)
-        .bottomDropCard(radius: Theme.Radius.card, shade: LightSheet.whiteShadeOnColour)
+        .buttonStyle(PressBounceStyle())
+        .disabled(!active)
     }
 
     /// The metric's fox sticker (or red-gradient SF-symbol fallback) — no circle
@@ -301,7 +278,7 @@ struct AppleHealthView: View {
                 // others were; the pipeline now normalises every sticker to the
                 // same ink height, so the exception was correcting a difference
                 // that no longer exists.
-                .frame(width: 52, height: 52)
+                .frame(width: 56, height: 56)
         } else {
             Image(systemName: metric.iconSystemName)
                 .resizable()
@@ -315,26 +292,14 @@ struct AppleHealthView: View {
 
     // MARK: - Collect animation
 
-    /// Collects every metric's activity at once, then hands straight to the
-    /// success screen.
-    ///
-    /// There used to be a "+N min" pop over a black scrim first: a number
-    /// counting up, floating away, and 1.3 seconds of waiting before anything
-    /// happened. It was written when collecting led nowhere and the pop WAS the
-    /// reward. Now it leads to a screen that says the same thing better, so the
-    /// pop was one celebration in front of another, and the slower of the two.
-    private func collectAll() {
-        let ids = store.healthMetrics
-            .filter { $0.hasActivity && $0.pendingMinutes > 0 }
-            .map(\.id)
-        let amount = pendingTotal
-        guard amount > 0 else { return }
-        // `reduce` rather than `forEach`: any one of these can be the first
-        // completion today, and collecting several at once shouldn't fire
-        // several celebrations.
-        collectedWasFirstToday = ids.reduce(false) { store.collectHealth($1) || $0 }
+    /// Each metric is its own claim target, so the remaining cards stay
+    /// available when the reward screen closes.
+    private func collect(_ metric: HealthMetric) {
+        guard metric.hasActivity, metric.pendingMinutes > 0 else { return }
+        Haptics.impact(.light)
+        collectedWasFirstToday = store.collectHealth(metric.id)
         store.recordHealthCollect()
-        collected = CollectedCoins(amount: amount, script: .random)
+        collected = CollectedCoins(amount: metric.pendingMinutes, script: .random)
     }
 
 
@@ -351,13 +316,13 @@ struct AppleHealthView: View {
             HStack(alignment: .top, spacing: Theme.Spacing.s) {
                 Image(systemName: "info.circle")
                     .font(.system(size: RowType.label))
-                    .foregroundStyle(LightSheet.onColour)
+                    .foregroundStyle(LightSheet.subtitleDark)
                 // Settings → Privacy & Security → Health, not the old
                 // Settings → Health → Data Access & Devices, which hasn't been
                 // the path for several iOS versions.
                 Text("Not seeing your activity? Check Aura's access in Settings → Privacy & Security → Health.")
                     .auraFont(.body, RowType.subLabel, .medium)
-                    .foregroundStyle(LightSheet.onColour)
+                    .foregroundStyle(LightSheet.subtitleDark)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -369,7 +334,10 @@ struct AppleHealthView: View {
         VStack(spacing: 0) {
             HStack {
                 Spacer()
-                CircleIconButton(symbol: "xmark", glyphColor: LightSheet.subtitleDark, bounces: false) { dismiss() }
+                CircleIconButton(symbol: "xmark", glyphColor: LightSheet.subtitleDark,
+                                 bounces: false) {
+                    dismiss()
+                }
             }
             .padding(.horizontal, Theme.Spacing.xl)
             .padding(.top, Theme.Spacing.l)
@@ -379,8 +347,6 @@ struct AppleHealthView: View {
             VStack(spacing: Theme.Spacing.l) {
                 HealthConnectHero()
 
-                // White, not the dark pair: this block sits below the arc,
-                // where the field is the method's pink.
                 VStack(spacing: Theme.Spacing.s) {
                     Text("Connect to Apple Health")
                         .auraFont(.display, SheetType.title, .bold)
@@ -413,19 +379,23 @@ struct AppleHealthView: View {
                 .padding(.bottom, Theme.Spacing.m)
 
             Button {
-                Task { await store.connectHealth() }
+                Task {
+                    await store.connectHealth()
+                    Haptics.notify(store.isHealthConnected ? .success : .error)
+                }
             } label: {
                 // The same white capsule as the Collect button on the other
                 // side of this sheet — white face, the field's own pink for the
                 // label, and the opaque edge every white face on colour uses.
                 Text("Continue")
                     .font(SheetType.ctaFont)
-                    .foregroundStyle(HabitCategory.healthSync.accent)
+                    .foregroundStyle(LightSheet.healthPermissionPink)
                     .frame(maxWidth: .infinity)
                     .frame(height: 56)
-                    .whiteDropCapsule(depth: 5, shade: LightSheet.whiteShadeOnColour)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PillPressButtonStyle(face: .white,
+                                               shade: LightSheet.whiteShadeOnColour,
+                                               lip: 5))
             .padding(.horizontal, Theme.Spacing.xl)
             .padding(.bottom, Theme.Spacing.l)
         }

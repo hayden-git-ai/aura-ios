@@ -31,22 +31,23 @@ struct FocusTimerSetupView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            EarnMethodIllustratedHeader {
+                EarnMethodRewardRibbon(
+                    asset: "DeepFocusRewardRibbon",
+                    accessibilityLabel: "Stay focused, Earn coins!"
+                )
+            }
 
             ScrollView(showsIndicators: false) {
-                VStack(spacing: Theme.Spacing.l) {
-                    hero
-                    VStack(spacing: Theme.Spacing.m) {
-                        // Routine first: it is the only row that says WHEN,
-                        // and the two under it both describe the session
-                        // itself. Sitting last it read as an afterthought
-                        // tacked below a settled pair.
-                        routineCard
-                        targetCard
-                        extremeFocusCard
-                    }
+                VStack(spacing: Theme.Spacing.m) {
+                    // Routine first: it is the only row that says WHEN,
+                    // and the two under it both describe the session itself.
+                    routineCard
+                    targetCard
+                    extremeFocusCard
                 }
                 .padding(.horizontal, Theme.Spacing.xl)
-                .padding(.top, Theme.Spacing.s)
+                .padding(.top, Theme.Spacing.xxl)
                 .padding(.bottom, Theme.Spacing.l)
             }
 
@@ -58,10 +59,10 @@ struct FocusTimerSetupView: View {
                     Image(systemName: "square.and.arrow.up")
                         .font(.system(size: 14, weight: .bold))
                 }
-                .foregroundStyle(.white)
+                .foregroundStyle(LightSheet.title)
                 .padding(.horizontal, Theme.Spacing.l)
                 .padding(.vertical, Theme.Spacing.s)
-                .background(LightSheet.surfaceOnColour, in: Capsule())
+                .background(LightSheet.chromeOnLight, in: Capsule())
             }
             .buttonStyle(PressBounceStyle())
             .padding(.bottom, Theme.Spacing.s)
@@ -71,18 +72,17 @@ struct FocusTimerSetupView: View {
                 .padding(.bottom, Theme.Spacing.l)
         }
         .overlay(alignment: .topLeading) {
-            CircleIconButton(symbol: "xmark", glyphColor: LightSheet.subtitleDark, bounces: false) { onClose() }
+            CircleIconButton(symbol: "xmark", fill: LightSheet.chromeOnBlue,
+                             glyphColor: .white, bounces: false) { onClose() }
                 .padding(.leading, Theme.Spacing.xl)
                 .padding(.top, Theme.Spacing.l)
         }
         .overlay(alignment: .topTrailing) {
-            ExplainerButton(explainer: QuestExplainer.lockIn)
+            ExplainerButton(explainer: QuestExplainer.lockIn, onBlue: true)
             .padding(.trailing, Theme.Spacing.xl)
             .padding(.top, Theme.Spacing.l)
         }
-        .background(MethodScreenBackground(
-            height: MethodScreenBackground.heroCentred(stickerHeight: HabitCategory.focus.heroHeight),
-            color: HabitCategory.focus.accent))
+        .background(EarnMethodIllustratedBackground())
         .preferredColorScheme(.light)
         .onAppear {
             if let initialLength, !didApplyInitial {
@@ -112,29 +112,13 @@ struct FocusTimerSetupView: View {
         }
     }
 
-    // MARK: - Hero (mascot + title)
-
-    /// `FocusHero`, not a copy of it. This was hand-rolled from the same parts
-    /// and had drifted: 12 between mascot and title where the other three quest
-    /// screens had 10. Two screens that are meant to be identical can't be two
-    /// pieces of code.
-    private var hero: some View {
-        FocusHero(
-            sticker: HabitCategory.focus.heroIconAsset,
-            title: "Deep Focus",
-            subtitle: "Apps stay locked till the timer's up!",
-            stickerHeight: HabitCategory.focus.heroHeight,
-            titleColor: .white,
-            subtitleColor: LightSheet.onColour
-        )
-    }
-
     // MARK: - Cards
 
     private var targetCard: some View {
         Button { showTargetPicker = true } label: {
             settingRow(
-                sticker: "FoxLockInFocusLength",
+                sticker: "DeepFocusFocusLength",
+                stickerSize: 44,
                 title: "Focus Length",
                 value: extremeFocus ? "As long as you can!" : FocusDuration.label(lengthMinutes),
                 // Greyed while Extreme Focus is on: the row is disabled.
@@ -150,7 +134,7 @@ struct FocusTimerSetupView: View {
     private var extremeFocusCard: some View {
         settingRow(
             sticker: "FoxLockInExtremeFocus",
-            stickerSize: 32,
+            stickerSize: 44,
             title: "Extreme Focus",
             value: extremeFocus ? "On" : "Off",
             // On the orange face both lines go white; off, they take the same
@@ -163,6 +147,7 @@ struct FocusTimerSetupView: View {
             Toggle("", isOn: $extremeFocus.animation(.snappy(duration: 0.25)))
                 .labelsHidden()
                 .tint(.white.opacity(extremeFocus ? 0.35 : 0))
+                .onChange(of: extremeFocus) { _, _ in Haptics.impact(.light) }
         }
     }
 
@@ -175,7 +160,8 @@ struct FocusTimerSetupView: View {
     private var routineCard: some View {
         Button { showRoutine = true } label: {
             settingRow(
-                sticker: "FoxLockInRoutine",
+                sticker: "DeepFocusRoutine",
+                stickerSize: 44,
                 title: "Routine",
                 value: routine?.summary ?? "Off"
             ) { chevron }
@@ -199,7 +185,7 @@ struct FocusTimerSetupView: View {
     /// accessory (chevron or toggle).
     private func settingRow<Trailing: View>(
         sticker: String,
-        stickerSize: CGFloat = 38,
+        stickerSize: CGFloat = 44,
         title: String,
         value: String,
         valueColor: Color = RowType.valueColor,
@@ -216,7 +202,7 @@ struct FocusTimerSetupView: View {
                 .interpolation(.high)
                 .scaledToFit()
                 .frame(width: stickerSize, height: stickerSize)
-                .frame(width: 38, height: 38)
+                .frame(width: 44, height: 44)
 
             // A settings row, not a chart key: the NAME leads and the value is
             // its current state underneath — same order as Settings' nav rows,
@@ -237,7 +223,7 @@ struct FocusTimerSetupView: View {
             trailing()
         }
         .padding(.horizontal, Theme.Spacing.m)
-        .frame(height: 64)
+        .frame(height: 68)
         .bottomDropCard(radius: Theme.Radius.card, face: fill, shade: shade)
     }
 
@@ -254,9 +240,10 @@ struct FocusTimerSetupView: View {
         } label: {
             Text("Lock In")
                 .font(SheetType.ctaFont)
-                .foregroundStyle(HabitCategory.focus.accent)
+                .foregroundStyle(.white)
         }
-        .buttonStyle(PillPressButtonStyle(face: .white, shade: LightSheet.whiteShadeOnColour))
+        .buttonStyle(PillPressButtonStyle(face: HabitCategory.focus.accent,
+                                           shade: HabitCategory.focus.accentShade))
     }
 }
 

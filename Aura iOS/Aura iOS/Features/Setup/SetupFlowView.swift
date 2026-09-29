@@ -23,7 +23,18 @@ struct SetupFlowView: View {
                     // normally), offset by its signed distance from the current step.
                     // The current screen sits at offset 0; neighbours wait just off
                     // either edge. Changing the step animates the offsets together.
-                    screen(for: step)
+                    Group {
+                        if step.rawValue == current {
+                            // The visible screen's background must keep drawing
+                            // through the top and bottom safe areas.
+                            screen(for: step)
+                        } else {
+                            // Off-screen backgrounds ignore safe areas too. Clip
+                            // only those pages so they cannot bleed in from a
+                            // horizontal edge after a transition completes.
+                            screen(for: step).clipped()
+                        }
+                    }
                         .frame(width: w, height: geo.size.height)
                         .offset(x: CGFloat(step.rawValue - current) * w)
                         // Only the current screen takes touches — the others are
@@ -40,7 +51,6 @@ struct SetupFlowView: View {
     @ViewBuilder
     private func screen(for step: SetupFlow.Step) -> some View {
         switch step {
-        case .welcome:       SetupWelcomeView()
         case .signIn:        SetupSignInView()
         case .notifications: SetupNotificationsView()
         case .screenTime:    SetupScreenTimeView()

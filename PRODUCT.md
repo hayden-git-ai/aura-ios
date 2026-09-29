@@ -16,6 +16,11 @@ workflow on any given screen: either "how do I earn time back" (Gate/Home) or
 
 ## Product Purpose
 
+Deep Focus earns **1 coin per minute focused** (60 coins per hour). A completed
+15-minute session must award 15 coins. This fixed rate applies to existing users
+as well as new installs; old saved hourly rates must not reduce it. Confirmed by
+Hayden during physical-device testing on September 16, 2026.
+
 Aura blocks distracting apps by default and only unlocks them when the user
 completes a real habit — screen time is earned, not just budgeted or nagged
 about. Success looks like a user trusting the block enough to stop

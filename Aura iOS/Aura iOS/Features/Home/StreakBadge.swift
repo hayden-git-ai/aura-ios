@@ -50,7 +50,7 @@ struct StreakBadge: View {
                 Circle()
                     .fill(Color.white.opacity(0.12))
                     .frame(width: 44, height: 44)
-                Image("StreakFireIcon")
+                Image("StreakFlame")
                     .resizable()
                     .interpolation(.high)
                     .scaledToFit()

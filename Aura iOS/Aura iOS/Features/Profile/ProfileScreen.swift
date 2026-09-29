@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import DeviceActivity
 
 /// The Profile tab: an X-style header — a cover banner, a settable avatar that
 /// straddles the seam with the stats beside it, then the name + join year on the
@@ -167,14 +168,15 @@ struct ProfileScreen: View {
     /// Opens the settings screen. A translucent dark disc on the banner, like
     /// the reference's cover buttons.
     private var gearButton: some View {
-        Button { showSettings = true } label: {
-            Image("Settings_Gear")
-                .resizable()
-                .interpolation(.high)
-                .scaledToFit()
+        Button {
+            Haptics.impact(.light)
+            showSettings = true
+        } label: {
+            WoodButtonArtwork(role: .settings, diameter: 40)
                 .frame(width: 44, height: 44)
+                .contentShape(Circle())
         }
-        .buttonStyle(PressBounceStyle())
+        .buttonStyle(PressBounceStyle(hapticsEnabled: false))
     }
 
     // MARK: - Profile info
@@ -216,7 +218,7 @@ struct ProfileScreen: View {
         } label: {
             ProfileAvatarCircle(size: Self.avatarSize)
         }
-        .buttonStyle(PressBounceStyle())
+        .buttonStyle(PressBounceStyle(hapticsEnabled: false))
     }
 
     /// Downscales an image to an avatar-sized JPEG and stores it locally.
@@ -233,8 +235,11 @@ struct ProfileScreen: View {
     /// The two pill actions under the name — `chromeOnLight` capsules on the ground.
     private var profileButtons: some View {
         HStack(spacing: Theme.Spacing.m) {
-            Button { showEditProfile = true } label: { pillLabel("Edit profile") }
-                .buttonStyle(PressBounceStyle())
+            Button {
+                Haptics.impact(.light)
+                showEditProfile = true
+            } label: { pillLabel("Edit profile") }
+                .buttonStyle(PressBounceStyle(hapticsEnabled: false))
 
             ShareLink(item: AuraLink.site) { pillLabel("Share Aura") }
                 .buttonStyle(PressBounceStyle())
@@ -384,7 +389,7 @@ struct ProfileScreen: View {
                               value: "\(store.lifetimeHealthyHabits)", label: "Habits done")
             profileStatColumn(sticker: "ProfileStatTimeSaved", iconScale: 1.07,
                               value: timeSavedLabel,
-                              label: ScreenTimeDataAvailability.displaysSampleData ? "Time saved" : "Screen Time unavailable")
+                              label: "Hours Saved")
         }
     }
 
@@ -397,15 +402,21 @@ struct ProfileScreen: View {
                     .frame(height: Self.statIconHeight)
                     .scaleEffect(iconScale)
 
-                StrokedNumber(text: value,
-                              font: Typography.displayUIFont(size: Self.statNumberSize, weight: .black, tabular: true),
-                              fill: .black,
-                              stroke: .white,
-                              outlineWidth: 2.2)
-                    .fixedSize()
-                    .shadow(color: .black.opacity(0.25), radius: 2, y: 1)
-                    // Sits over the icon, extending a little below it.
-                    .offset(y: Self.statNumberDrop)
+                Group {
+                    if label == "Hours Saved" {
+                        HoursSavedMetricView(fallback: value)
+                    } else {
+                        StrokedNumber(text: value,
+                                      font: Typography.displayUIFont(size: Self.statNumberSize, weight: .black, tabular: true),
+                                      fill: .black, stroke: .white, outlineWidth: 2.2)
+                    }
+                }
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
+                .allowsTightening(true)
+                .shadow(color: .black.opacity(0.25), radius: 2, y: 1)
+                .offset(y: Self.statNumberDrop)
+
             }
             .padding(.bottom, Theme.Spacing.xs)
 
@@ -413,6 +424,8 @@ struct ProfileScreen: View {
                 .auraFont(.body, RowType.subLabel, .semibold)
                 .foregroundStyle(LightSheet.controlIdle)
                 .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .allowsTightening(true)
         }
         .frame(maxWidth: .infinity)
     }
@@ -423,16 +436,37 @@ struct ProfileScreen: View {
     }
 
     private var timeSavedLabel: String {
-        guard ScreenTimeDataAvailability.displaysSampleData else { return "—" }
+        guard ScreenTimeDataAvailability.displaysSampleData else { return "0" }
         let weekTotal = screenTimeProvider.week().reduce(0) { $0 + $1.totalMinutes }
-        guard let saved = store.timeSavedMinutes(currentWeeklyMinutes: weekTotal) else { return "—" }
-        if saved < 60 { return "\(saved)m" }
-        let hours = saved / 60
-        if hours < 24 { return "\(hours)h" }
-        let days = hours / 24
-        if days < 30 { return "\(days)d" }
-        let months = days / 30
-        return months < 12 ? "\(months)mo" : "\(days / 365)y"
+        guard let saved = store.timeSavedMinutes(currentWeeklyMinutes: weekTotal), saved > 0 else { return "0" }
+        return String(format: "%.1fh", Double(saved) / 60)
+    }
+}
+
+private struct HoursSavedMetricView: View {
+    let fallback: String
+    var body: some View {
+#if DEBUG
+        fallbackNumber
+#else
+        ZStack {
+            // DeviceActivityReport can take a moment to attach its extension
+            // process. Keep the honest zero visible instead of leaving a hole.
+            fallbackNumber
+            DeviceActivityReport(.hoursSaved,
+                filter: DeviceActivityFilter(
+                    segment: .daily(during: DateInterval(start: Calendar.current.date(byAdding: .day, value: -14, to: Calendar.current.startOfDay(for: .now)) ?? .now, end: Calendar.current.startOfDay(for: .now))),
+                    users: .all, devices: .all))
+                .frame(width: 92, height: 32)
+        }
+#endif
+    }
+
+    private var fallbackNumber: some View {
+        StrokedNumber(text: fallback,
+                      font: Typography.displayUIFont(size: 22, weight: .black, tabular: true),
+                      fill: .black, stroke: .white, outlineWidth: 2.2)
+            .fixedSize()
     }
 }
 

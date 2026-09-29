@@ -184,13 +184,10 @@ release:
 npx -y supabase@latest secrets set PROOF_DISABLED=on --project-ref YOUR_REFERENCE
 ```
 
-While it is on, every request short-circuits before the key check, the rate gate,
-and any call to Google, and returns a pass. That is deliberate: a pass is the same
-thing the app already falls back to when it cannot reach the endpoint, so users
-keep earning while nothing is spent. The trade during an incident is that a few
-unverified photos get through, which is cheaper than a runaway bill and kinder
-than freezing everyone out. To freeze earning instead, change the disabled branch
-in `index.ts` to return `passed: false`.
+While it is on, every request returns HTTP 503 without calling a model. The
+client shows a retryable unavailable result and awards no coins. Network errors,
+malformed responses and model failures also fail closed. This behavior is part
+of the September 16 local fix and requires deploying the updated function.
 
 Turn it back on by clearing the secret:
 

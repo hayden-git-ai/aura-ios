@@ -175,7 +175,10 @@ struct RuleSheet: View {
 
             Toggle("", isOn: Binding(
                 get: { store.blockConfig.blockAdultWebsites },
-                set: { _ in activeSheet = .adult }
+                set: { _ in
+                    Haptics.impact(.light)
+                    activeSheet = .adult
+                }
             ))
             .labelsHidden()
             .tint(Theme.Color.signalGood)
@@ -207,7 +210,10 @@ struct RuleSheet: View {
                         .auraFont(.display, 17, .bold)
                         .foregroundStyle(SheetType.titleColor)
                     Spacer()
-                    Button { clearAll() } label: {
+                    Button {
+                        Haptics.impact(.light)
+                        clearAll()
+                    } label: {
                         Text("Clear All")
                             .auraFont(.body, SheetType.cardTitle, .bold)
                             .foregroundStyle(LightSheet.danger)
@@ -232,7 +238,7 @@ struct RuleSheet: View {
                 Spacer(minLength: 0)
                 minusBadge(icon)
             }
-            AppTileLabel(source: icon, side: 48)
+            AppTileLabel(source: icon, side: 56)
                 .padding(.bottom, Theme.Spacing.s)
         }
         .frame(maxWidth: .infinity)
@@ -244,6 +250,7 @@ struct RuleSheet: View {
 
     private func minusBadge(_ icon: AppIconSource) -> some View {
         Button {
+            Haptics.impact(.light)
             // The permanent rule costs a hold on a sheet; the other two confirm
             // in a plain alert.
             if rule == .blocked { activeSheet = .remove(icon) } else { pendingRemoval = icon }

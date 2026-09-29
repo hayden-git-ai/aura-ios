@@ -101,7 +101,7 @@ private struct OnbReviewCardRich: View {
             }
 
             Text(review.handle)
-                .auraFont(.display, SheetType.cardTitle, .bold)
+                .auraFont(.body, SheetType.cardTitle, .bold)
                 .foregroundStyle(LightSheet.title)
 
             Text("“\(review.quote)”")

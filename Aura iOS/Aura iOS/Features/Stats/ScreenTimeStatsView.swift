@@ -111,7 +111,7 @@ struct SummaryStatValue: View {
 
     var body: some View {
         Text("\(value)")
-            .auraFont(.display, SheetType.cardTitle, .bold)
+            .auraFont(.body, SheetType.cardTitle, .bold)
             .foregroundStyle(palette.headline)
             .monospacedDigit()
             .contentTransition(.numericText())
@@ -278,7 +278,7 @@ struct ScreenTimeSummary: View {
                                     .foregroundStyle(isFuture ? c.dayFuture
                                                      : isSelected ? c.dayLetter : c.barLabelIdle)
                                 Text("\(calendar.component(.day, from: entry.date))")
-                                    .auraFont(.display, RowType.label, .semibold)
+                                    .auraFont(.body, RowType.label, .semibold)
                                     .foregroundStyle(isSelected ? c.dateSelected
                                                      : isFuture ? c.dayFuture : c.dateIdle)
                                     .frame(width: 26, height: 26)
@@ -312,7 +312,7 @@ struct ScreenTimeSummary: View {
         VStack(spacing: 4) {
             Group {
                 Text(ScreenTimeSample.durationLabel(day.totalMinutes))
-                    .auraFont(.display, SummaryChart.figure, .bold)
+                    .auraFont(.body, SummaryChart.figure, .bold)
                     .foregroundStyle(c.headline)
                     .monospacedDigit()
                     .contentTransition(.numericText())

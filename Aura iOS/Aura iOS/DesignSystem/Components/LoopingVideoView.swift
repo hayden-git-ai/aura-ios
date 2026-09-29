@@ -22,12 +22,15 @@ struct LoopingVideoView: UIViewRepresentable {
     /// Bundled resource name and extension (e.g. "HomeBlockedFox", "mov").
     let resource: String
     var ext: String = "mov"
+    var isPlaying: Bool = true
 
     func makeUIView(context: Context) -> LoopingPlayerView {
-        LoopingPlayerView(resource: resource, ext: ext)
+        LoopingPlayerView(resource: resource, ext: ext, isPlaying: isPlaying)
     }
 
-    func updateUIView(_ uiView: LoopingPlayerView, context: Context) {}
+    func updateUIView(_ uiView: LoopingPlayerView, context: Context) {
+        uiView.setPlaying(isPlaying)
+    }
 }
 
 final class LoopingPlayerView: UIView {
@@ -35,9 +38,11 @@ final class LoopingPlayerView: UIView {
     private var playerLayer: AVPlayerLayer { layer as! AVPlayerLayer }
     private var looper: AVPlayerLooper?
     private let queue = AVQueuePlayer()
+    private var wantsPlayback = true
 
-    init(resource: String, ext: String) {
+    init(resource: String, ext: String, isPlaying: Bool = true) {
         super.init(frame: .zero)
+        wantsPlayback = isPlaying
         // Transparent so the alpha channel shows the background through it.
         backgroundColor = .clear
         isOpaque = false
@@ -58,14 +63,23 @@ final class LoopingPlayerView: UIView {
         // intermittent black band through the video.
 
         looper = AVPlayerLooper(player: queue, templateItem: AVPlayerItem(url: url))
-        queue.play()
+        reconcilePlayback()
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
+    func setPlaying(_ playing: Bool) {
+        wantsPlayback = playing
+        reconcilePlayback()
+    }
+
+    private func reconcilePlayback() {
+        if wantsPlayback && window != nil { queue.play() } else { queue.pause() }
+    }
+
     // Pause when pulled off-screen, resume when returned — no wasted decode.
     override func didMoveToWindow() {
         super.didMoveToWindow()
-        if window == nil { queue.pause() } else { queue.play() }
+        reconcilePlayback()
     }
 }

@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 /// Floating capsule nav in Instagram's shape: icon-only, evenly spaced, inset to
 /// the width of the Blocks cards and riding above the home indicator. The active
@@ -19,6 +20,9 @@ struct AuraTabBar: View {
     /// Kept for call-site compatibility; Earn no longer lives in the row.
     var centre: AuraTab
     var onCentre: () -> Void
+    /// The current account's photo, supplied by the shell so the profile tab
+    /// updates with the same observable store value as the profile screen.
+    var profileImageData: Data? = nil
     /// True on the flat-white tabs — the pill goes a touch darker there (still
     /// translucent, never a flat solid) so it reads against the white.
     var onLight: Bool = false
@@ -26,6 +30,12 @@ struct AuraTabBar: View {
     var shrink: CGFloat = 0
 
     private let icon: CGFloat = 40
+
+    /// Match the baked sticker pipeline instead of giving profile photos a
+    /// visibly heavier ring than the four illustrated tabs.
+    private var profileContour: CGFloat {
+        max(LightSheet.stickerContourFloor, icon * LightSheet.stickerContour)
+    }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -69,12 +79,7 @@ struct AuraTabBar: View {
             Haptics.impact(.light)
             withAnimation(.snappy(duration: 0.25)) { selection = tab }
         } label: {
-            Image(tab.sticker)
-                .resizable()
-                .interpolation(.high)
-                .scaledToFit()
-                .frame(width: icon, height: icon)
-                .overlay { statsDate(tab, scaled: icon) }
+            tabIcon(tab)
                 // The active sticker pops up and tilts.
                 .scaleEffect(selected ? 1.1 : 1)
                 .rotationEffect(.degrees(selected ? -9 : 0))
@@ -90,20 +95,40 @@ struct AuraTabBar: View {
                 .contentShape(Capsule())
                 .animation(.snappy(duration: 0.25), value: selected)
         }
-        .buttonStyle(PressBounceStyle())
+        .buttonStyle(PressBounceStyle(hapticsEnabled: false))
     }
 
     @ViewBuilder
-    private func statsDate(_ tab: AuraTab, scaled: CGFloat) -> some View {
-        if tab == .stats {
-            let s = scaled / Theme.Spacing.xxxl
-            Text("\(Calendar.current.component(.day, from: .now))")
-                .auraFont(.display, 15 * s, .bold)
-                .foregroundStyle(.black)
-                .minimumScaleFactor(0.4)
-                .lineLimit(1)
-                .frame(width: 30 * s)
-                .offset(y: 3 * s)
+    private func tabIcon(_ tab: AuraTab) -> some View {
+        if tab == .profile, let data = profileImageData,
+           let image = UIImage(data: data) {
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFill()
+                .frame(width: icon, height: icon)
+                .clipShape(Circle())
+                .overlay(Circle().strokeBorder(.white, lineWidth: profileContour))
+                .shadow(color: .black.opacity(0.18), radius: 3, y: 1)
+        } else {
+            ZStack {
+                Image(tab.sticker)
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFit()
+                    .frame(width: icon, height: icon)
+
+                if tab == .stats {
+                    Text(String(Calendar.current.component(.day, from: .now)))
+                        .font(.system(size: 9.5, weight: .black, design: .rounded))
+                        .foregroundStyle(.black)
+                        // The raw calendar carries a sample date. This small
+                        // white field replaces it before the live day is drawn.
+                        .frame(width: 18, height: 12)
+                        .background(Color.white)
+                        .offset(y: 2)
+                }
+            }
         }
     }
+
 }

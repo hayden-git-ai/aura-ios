@@ -62,14 +62,14 @@ struct HabitDetailView: View {
         ) {
             if requiresFocus {
                 HabitSettingRow(
-                    icon: .sticker("FoxFocusLengthPhoto"),
+                    icon: .sticker("HealthyHabitsFocusLength"),
                     title: "Focus length",
                     subtitle: FocusDuration.label(live.defaultFocusMinutes)
                 ) { editing = .length }
             } else {
                 VStack(alignment: .leading, spacing: Theme.Spacing.s) {
                     HabitToggleRow(
-                        icon: .sticker("StreakFireIcon"),
+                        icon: .sticker("OncePerDayFlame"),
                         title: "Once per day",
                         subtitle: live.oncePerDay ? "Yes" : "No",
                         isOn: Binding(get: { live.oncePerDay },
@@ -172,7 +172,7 @@ struct ExerciseDetailView: View {
             }
         ) {
             HabitSettingRow(
-                icon: .sticker("CameraRepsGoal"),
+                icon: .sticker("DailyExerciseGoal"),
                 title: "Goal",
                 subtitle: Exercise.goalDisplay(store.goal(for: exercise))
             ) { editing = .goal }
@@ -306,7 +306,7 @@ struct HabitDetailScaffold<Rows: View>: View {
                             Image(systemName: "square.and.arrow.up")
                                 .font(.system(size: 13, weight: .bold))
                         }
-                        .foregroundStyle(accent)
+                        .foregroundStyle(LightSheet.title)
                         .padding(.horizontal, Theme.Spacing.l)
                         .padding(.vertical, Theme.Spacing.m)
                         .background(LightSheet.chromeOnLight, in: Capsule())
@@ -332,8 +332,14 @@ struct HabitDetailScaffold<Rows: View>: View {
         }
         .overlay(alignment: .topTrailing) {
             if let onRoutine {
-                CircleIconButton(sticker: "FoxCreateRoutine",
-                                 fill: LightSheet.chromeOnBlue, stickerNudge: 1.5, action: onRoutine)
+                Button(action: onRoutine) {
+                    WoodButtonArtwork(role: .routine)
+                        .frame(width: CircleIconButton.minimumTarget,
+                               height: CircleIconButton.minimumTarget)
+                        .contentShape(Circle())
+                }
+                .buttonStyle(PressBounceStyle())
+                .accessibilityLabel("Create a routine")
                 .padding(.trailing, Theme.Spacing.xl)
                 .padding(.top, Theme.Spacing.l)
             }
@@ -383,7 +389,7 @@ struct HabitDetailScaffold<Rows: View>: View {
                 }
                 VStack(spacing: RowType.labelGap) {
                     Text(stat.0)
-                        .auraFont(.display, 22, .bold)
+                        .auraFont(.body, 22, .bold)
                         .foregroundStyle(LightSheet.title)
                         .monospacedDigit()
                         .contentTransition(.numericText())
@@ -431,6 +437,7 @@ struct HabitToggleRow: View {
             Toggle("", isOn: $isOn)
                 .labelsHidden()
                 .tint(Theme.Color.signalGood)
+                .onChange(of: isOn) { _, _ in Haptics.impact(.light) }
         }
         .padding(Theme.Spacing.l)
         // The default shade, not `whiteShadeOnColour`. That token is the opaque

@@ -38,7 +38,6 @@ struct WallOfWinsSheet: View {
                             Spacer()
                             CircleIconButton(symbol: "trash.fill",
                                              glyphColor: LightSheet.danger) {
-                                Haptics.impact(.light)
                                 confirmingWipe = true
                             }
                             .padding(.trailing, Theme.Spacing.xl)
@@ -59,7 +58,7 @@ struct WallOfWinsSheet: View {
                             } label: {
                                 WinTile(win: win)
                             }
-                            .buttonStyle(PressBounceStyle())
+                            .buttonStyle(PressBounceStyle(hapticsEnabled: false))
                         }
                     }
                     .padding(.horizontal, Theme.Spacing.xl)
@@ -87,27 +86,17 @@ struct WallOfWinsSheet: View {
 
 /// What the wall says before there is one — used both on the full sheet and
 /// inline under the Wall of Wins strip on the main screen, so an empty wall
-/// reads the same in both places rather than one showing the fox and the other
+/// reads the same in both places rather than one showing art and the other
 /// a blank gap. Callers add their own vertical framing: the sheet centres it in
 /// the whole body, the strip gives it a little breathing room.
 struct WinsEmptyState: View {
     var body: some View {
         VStack(spacing: Theme.Spacing.m) {
-            // The crying fox — its own art, not the method mascot standing in.
-            // 147 lands the same ~117pt fox on screen as the other empty
-            // states: it fills 80% of its canvas where Add Habit's fills 83%.
-            Image("Stats_Wall of Wins Empty State")
-                .resizable()
-                .interpolation(.high)
-                .scaledToFit()
-                .frame(height: 147)
-                .foxShadow()
-
             Text("No wins yet")
                 .auraFont(.display, SheetType.cardTitle, .bold)
                 .foregroundStyle(SheetType.titleColor)
 
-            Text("Complete a Photo Proof habit and it lands here.")
+            Text("Complete a healthy habit with photo-verification and you'll see it here.")
                 .auraFont(.body, SheetType.cardBlurb, .regular)
                 .foregroundStyle(SheetType.subtitleColor)
                 .multilineTextAlignment(.center)
@@ -180,8 +169,12 @@ struct WinDetailView: View {
         ZStack(alignment: .top) {
             Color.black.ignoresSafeArea()
 
-            WinPhotoView(photo: win.photo, bundledPadding: Theme.Spacing.xxxl)
-                .ignoresSafeArea()
+            GeometryReader { proxy in
+                WinPhotoView(photo: win.photo, bundledPadding: Theme.Spacing.xxxl)
+                    .frame(width: proxy.size.width, height: proxy.size.height)
+                    .clipped()
+            }
+            .ignoresSafeArea()
 
             // Darkens the foot of the photo so the label reads on it whatever
             // the picture happens to be. A gradient rather than a bar: the
@@ -219,20 +212,14 @@ struct WinDetailView: View {
             .overlay(alignment: .topLeading) {
                 CircleIconButton(symbol: "xmark",
                                  fill: LightSheet.chromeOnPhoto, glyphColor: .white) {
-                    Haptics.impact(.light)
                     dismiss()
                 }
                 .padding(.leading, Theme.Spacing.xl)
                 .padding(.top, Theme.Spacing.s)
             }
             .overlay(alignment: .topTrailing) {
-                // White, not `danger`. Red on a translucent disc measures 4.6:1
-                // over a dark photo and 1.31:1 over a bright one, and a win can
-                // be either. The destructive framing is carried by the alert's
-                // red Delete button, which is where it can't be washed out.
                 CircleIconButton(symbol: "trash.fill",
-                                 fill: LightSheet.chromeOnPhoto, glyphColor: .white) {
-                    Haptics.impact(.light)
+                                 fill: .white.opacity(0.88), glyphColor: LightSheet.danger) {
                     confirming = true
                 }
                 .padding(.trailing, Theme.Spacing.xl)

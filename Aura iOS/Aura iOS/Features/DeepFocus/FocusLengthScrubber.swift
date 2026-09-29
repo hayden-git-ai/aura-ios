@@ -117,7 +117,7 @@ struct FocusLengthScrubber: View {
             }
 
             Text(FocusDuration.label(lengthMinutes))
-                .auraFont(.display, 22, .bold)
+                .auraFont(.body, 22, .bold)
                 .foregroundStyle(tint)
                 // Odometer roll when the value changes inside an animation —
                 // i.e. on a `-`/`+` tap (see `bump`). Drag changes are not

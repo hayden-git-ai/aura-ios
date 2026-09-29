@@ -53,12 +53,12 @@ struct FocusSuccessView: View {
         VStack(spacing: Theme.Spacing.s) {
             HStack(spacing: Theme.Spacing.s) {
                 // The Focus Length sticker from the Lock In setup sheet.
-                EarnStatTile(icon: { EarnTileIcon(asset: "FoxLockInFocusLength") },
+                EarnStatTile(icon: { EarnTileIcon(asset: "DeepFocusFocusLength") },
                              value: durationText, label: "Time focused")
                 // The chest from Home's Quests card.
                 EarnStatTile(icon: { EarnTileIcon(asset: "EarnCardIcon") },
                              value: "+\(session.earnedMinutes)", label: "Coins earned")
-                EarnStatTile(icon: { EarnTileIcon(asset: "StreakFireIcon") },
+                EarnStatTile(icon: { EarnTileIcon(asset: "StreakFlame") },
                              value: "\(store.streak.currentStreak)", label: "Day streak")
             }
             .fixedSize(horizontal: false, vertical: true)

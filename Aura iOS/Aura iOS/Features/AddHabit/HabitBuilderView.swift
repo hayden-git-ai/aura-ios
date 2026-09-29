@@ -32,6 +32,7 @@ struct HabitBuilderView: View {
     @State private var photoHint = ""
 
     @FocusState private var nameFocused: Bool
+    @FocusState private var photoHintFocused: Bool
 
     private var isFocusMethod: Bool { method == .focus }
     private var usesFocus: Bool { requiresFocus || isFocusMethod }
@@ -62,8 +63,9 @@ struct HabitBuilderView: View {
             .padding(.horizontal, Theme.Spacing.xl)
             .padding(.top, Theme.Spacing.l)
 
-            ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: Theme.Spacing.l) {
+            ScrollViewReader { proxy in
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: Theme.Spacing.l) {
                     nameField
 
                     if !isFocusMethod {
@@ -87,13 +89,21 @@ struct HabitBuilderView: View {
                     }
                     .transition(slide)
 
-                    if method == .photoTask {
-                        fieldSection("Photo Hint") { photoHintField }
+                        if method == .photoTask {
+                            fieldSection("Photo Hint") { photoHintField }
+                                .id("photo-hint")
+                        }
+                    }
+                    .padding(.horizontal, Theme.Spacing.xl)
+                    .padding(.top, Theme.Spacing.l)
+                    .padding(.bottom, Theme.Spacing.xxl)
+                }
+                .onChange(of: photoHintFocused) { _, focused in
+                    guard focused else { return }
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        proxy.scrollTo("photo-hint", anchor: .center)
                     }
                 }
-                .padding(.horizontal, Theme.Spacing.xl)
-                .padding(.top, Theme.Spacing.l)
-                .padding(.bottom, Theme.Spacing.xxl)
             }
 
             footer
@@ -103,7 +113,7 @@ struct HabitBuilderView: View {
         .background(LightSheet.bg.ignoresSafeArea())
         .presentationDetents([.large])
         .presentationDragIndicator(.hidden)
-        .ignoresSafeArea(.keyboard, edges: .bottom)
+        .scrollDismissesKeyboard(.interactively)
         .onAppear(perform: load)
         .sheet(isPresented: $showStickerPicker) {
             StickerPickerSheet(selected: sticker.isEmpty ? nil : sticker) { sticker = $0 ?? "" }
@@ -118,7 +128,10 @@ struct HabitBuilderView: View {
     // MARK: - Avatar (sticker picker)
 
     private var avatar: some View {
-        Button { showStickerPicker = true } label: {
+        Button {
+            Haptics.impact(.light)
+            showStickerPicker = true
+        } label: {
             ZStack(alignment: .bottomTrailing) {
                 Group {
                     if sticker.isEmpty {
@@ -219,7 +232,10 @@ struct HabitBuilderView: View {
     /// Opens the same hours/minutes wheel Lock In uses, rather than a stepper —
     /// picking 45m shouldn't take nine taps.
     private var focusLengthCard: some View {
-        Button { showFocusPicker = true } label: {
+        Button {
+            Haptics.impact(.light)
+            showFocusPicker = true
+        } label: {
             plainCard {
                 HStack(spacing: Theme.Spacing.m) {
                     Text(FocusDuration.label(focusMinutes))
@@ -277,6 +293,7 @@ struct HabitBuilderView: View {
                     .auraFont(.body, 16, .medium)
                     .foregroundStyle(LightSheet.title)
                     .lineLimit(1...3)
+                    .focused($photoHintFocused)
                     // Return inserts a newline here, so give it an explicit close.
                     .keyboardDoneToolbar()
                 Text("This helps Aura verify niche habits")
@@ -293,7 +310,10 @@ struct HabitBuilderView: View {
                     .auraFont(.body, RowType.label, .medium)
                     .foregroundStyle(RowType.labelColor)
                 Spacer(minLength: Theme.Spacing.s)
-                Toggle("", isOn: $oncePerDay).labelsHidden().tint(LightSheet.green)
+                Toggle("", isOn: $oncePerDay)
+                    .labelsHidden()
+                    .tint(LightSheet.green)
+                    .onChange(of: oncePerDay) { _, _ in Haptics.impact(.light) }
             }
             .frame(height: 31)
         }

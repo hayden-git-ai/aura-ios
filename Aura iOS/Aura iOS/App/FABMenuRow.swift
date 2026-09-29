@@ -73,7 +73,10 @@ struct FABMenuRow: View {
                 .animation(.spring(response: 0.34, dampingFraction: 0.7).delay(stagger), value: isOpen)
         }
         .contentShape(Rectangle())
-        .onTapGesture { onTap() }
+        .onTapGesture {
+            Haptics.impact(.light)
+            onTap()
+        }
         .onChange(of: isOpen) { _, open in
             if open {
                 withAnimation(.spring(response: 0.34, dampingFraction: 0.78).delay(insertionStagger + 0.05)) {

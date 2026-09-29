@@ -42,6 +42,9 @@ struct PhotoProofFlowRoot: View {
 
     @State private var stage: Stage = .select
     @State private var didApplyStart = false
+    @State private var didHandlePass = false
+    @State private var didStart = false
+    @State private var showSessionConflict = false
 
     var body: some View {
         Group {
@@ -86,7 +89,7 @@ struct PhotoProofFlowRoot: View {
                     // explanation. Everywhere else the coins have landed and
                     // saying so is words under a button.
                     footnote: habit.requiresFocusSession
-                        ? "Your apps will unlock once the timer ends."
+                        ? "You'll earn coins when the timer ends."
                         : nil,
                     onButton: { startAndDismiss(habit: habit, minutes: minutes) }
                 )
@@ -98,9 +101,21 @@ struct PhotoProofFlowRoot: View {
                 stage = .camera(startHabit, startMinutes ?? startHabit.defaultFocusMinutes)
             }
         }
+        .alert("Finish your current session first", isPresented: $showSessionConflict) {
+            Button("OK") { dismiss() }
+        } message: {
+            Text("Finish or end your current habit or focus session before starting another.")
+        }
     }
 
     private func handlePass(habit: Habit, minutes: Int, image: UIImage?) {
+        guard !didHandlePass else { return }
+        guard !store.isSessionRunning else {
+            Haptics.notify(.error)
+            showSessionConflict = true
+            return
+        }
+        didHandlePass = true
         // Filed before anything else: the wall is the record that this happened,
         // and the frame only exists until this view goes away.
         if let image {
@@ -130,6 +145,13 @@ struct PhotoProofFlowRoot: View {
     }
 
     private func startAndDismiss(habit: Habit, minutes: Int) {
+        guard !didStart else { return }
+        guard !store.isSessionRunning else {
+            Haptics.notify(.error)
+            showSessionConflict = true
+            return
+        }
+        didStart = true
         if habit.requiresFocusSession {
             // Focus habit: start the home-screen timer that grants length ×
             // rate when it ends.

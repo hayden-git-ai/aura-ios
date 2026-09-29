@@ -132,7 +132,7 @@ struct HealthConnectHero: View {
     private var check: some View {
         Image(systemName: "checkmark")
             .font(.system(size: 15, weight: .bold))
-            .foregroundStyle(HabitCategory.healthSync.accent)
+            .foregroundStyle(LightSheet.healthPermissionPink)
             .frame(width: checkSide, height: checkSide)
             .background(Circle().fill(.white))
     }
@@ -170,7 +170,7 @@ struct HealthConnectHero: View {
     private func chip(_ text: String, y: CGFloat, onLeft: Bool) -> some View {
         Text(text)
             .auraFont(.body, RowType.subLabel, .semibold)
-            .foregroundStyle(HabitCategory.healthSync.accent)
+            .foregroundStyle(LightSheet.healthPermissionPink)
             .padding(.horizontal, Theme.Spacing.m)
             .padding(.vertical, Theme.Spacing.xs + 2)
             .background(Capsule().fill(.white))

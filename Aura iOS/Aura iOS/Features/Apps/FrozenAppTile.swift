@@ -11,7 +11,7 @@ import SwiftUI
 struct FrozenAppTile: View {
     let icon: AppIconSource
     /// The app icon's visible size; the ice frame is sized around it.
-    var side: CGFloat = 58
+    var side: CGFloat = 64
     /// A few degrees of hand-placed lean per tile.
     var tilt: Double = 0
     /// Compact drops the frame for tiny spots (the home pill), where the drips

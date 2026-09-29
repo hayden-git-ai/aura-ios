@@ -7,20 +7,14 @@ import SwiftUI
 import UIKit
 import CoreText
 
-/// Font tokens. Two families (both bundled variable fonts — see
-/// FontRegistration.swift):
-/// - **Montserrat** — headers / display: titles, statistics, big numbers,
-///   headlines, the streak count.
-/// - **Rubik** — body copy, labels, captions.
-///
-/// Call sites keep using SwiftUI's named `Font.Weight`; `wght(for:)` maps those
-/// onto each family's `wght` axis (`.regular`→400, `.medium`→500, `.semibold`→
-/// 600, `.bold`→700, `.heavy`→800, `.black`→900).
+/// Lilita One supplies titles and hero lettering; Rubik supplies body and controls.
+/// Lilita One is a static face: display weight arguments remain source-compatible
+/// but never synthesize bold weights.
 enum Typography {
 
     private static let wghtAxisTag = 0x77676874 // OpenType 'wght' axis tag ('w','g','h','t')
 
-    /// Both bundled variable files expose a single PostScript name locked to
+    /// The bundled Rubik variable file exposes a single PostScript name locked to
     /// their default instance; every other weight is dialed in via the `wght`
     /// variation axis, not by referencing a different name.
     private static let rubikPostScriptName = "Rubik-Light"
@@ -51,15 +45,18 @@ enum Typography {
         }
     }
 
-    // MARK: - Headers / display (Rubik — the app uses one family)
+    // MARK: - Headers / display (Lilita One)
 
-    /// Feature titles, statistics, headlines. Bold (700) is the ceiling for
-    /// the whole app — nothing gets set heavier, however big it is. The only
-    /// three exceptions, all sticker-style outlined type: the streak number in
-    /// the Gate header, the streak number on the celebration screen, and the
-    /// earn-grid card labels (`StrokedLabel`).
+    private static func headlineUIFont(size: CGFloat) -> UIFont {
+        guard let font = UIFont(name: "LilitaOne", size: size) else {
+            assertionFailure("Lilita One must be registered before constructing display text.")
+            return rubikUIFont(size: size, weight: 700)
+        }
+        return font
+    }
+
     static func display(size: CGFloat, weight: Font.Weight = .bold) -> Font {
-        Font(rubikUIFont(size: size, weight: wght(for: weight)))
+        Font(headlineUIFont(size: size))
     }
 
 
@@ -69,7 +66,9 @@ enum Typography {
     /// so the digits keep a fixed width and don't jitter as they update.
     /// Leave it off for stroked wordmarks (AURA / Apps / Settings / the name).
     static func displayUIFont(size: CGFloat, weight: Font.Weight = .bold, tabular: Bool = false) -> UIFont {
-        let font = rubikUIFont(size: size, weight: wght(for: weight))
+        // Lilita One has proportional digits and no tnum feature. Keep changing
+        // numbers in Rubik so timers, balances, and digit reels remain stable.
+        let font = tabular ? rubikUIFont(size: size, weight: wght(for: weight)) : headlineUIFont(size: size)
         guard tabular else { return font }
         let feature: [UIFontDescriptor.FeatureKey: Any] = [
             .type: kNumberSpacingType,
@@ -101,7 +100,7 @@ enum Typography {
     /// the top. Picking per role is what stops a 34pt figure and an 11pt
     /// caption from converging.
     enum Role {
-        /// Montserrat — titles, figures, headlines.
+        /// Lilita One — titles, hero lettering, headlines.
         case display
         /// Rubik — body copy, labels.
         case body

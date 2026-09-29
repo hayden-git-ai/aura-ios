@@ -47,6 +47,10 @@ struct AuraWheelColumn<Value: Hashable>: View {
     /// Row type size. Defaults to the light-sheet 20; larger on standalone
     /// number pickers (age) where the value carries the screen.
     var fontSize: CGFloat = 20
+    /// Defaults preserve the compact wheels used throughout the app. Standalone
+    /// number questions can opt into a larger, easier-to-read wheel.
+    var rowHeight: CGFloat = AuraWheel.rowHeight
+    var wheelHeight: CGFloat = AuraWheel.height
     /// The centred (selected) row's colour.
     var selectedColor: Color = LightSheet.title
     /// The off-centre rows' colour.
@@ -68,11 +72,11 @@ struct AuraWheelColumn<Value: Hashable>: View {
             LazyVStack(spacing: 0) {
                 ForEach(0..<rowCount, id: \.self) { index in
                     Text(label(value(at: index)))
-                        .auraFont(.display, fontSize, .bold)
+                        .auraFont(.body, fontSize, .bold)
                         // Explicit on both sides: a row that inherits its colour
                         // follows the system appearance.
                         .foregroundStyle(index == position ? selectedColor : idleColor)
-                        .frame(height: AuraWheel.rowHeight)
+                        .frame(height: rowHeight)
                         .frame(maxWidth: .infinity)
                 }
             }
@@ -80,7 +84,7 @@ struct AuraWheelColumn<Value: Hashable>: View {
         }
         // Half a wheel of margin at each end, so the first and last values can
         // reach the centre pill like every other one.
-        .contentMargins(.vertical, (AuraWheel.height - AuraWheel.rowHeight) / 2, for: .scrollContent)
+        .contentMargins(.vertical, (wheelHeight - rowHeight) / 2, for: .scrollContent)
         .scrollTargetBehavior(.viewAligned)
         .scrollPosition(id: $position)
         // Rows thin out toward the ends, the way a real wheel falls away. A

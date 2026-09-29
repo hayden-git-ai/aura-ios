@@ -32,7 +32,11 @@ Do not paste a raw number or hex into a feature view.
 
 ---
 
-## 1. Type, one family: Rubik
+## 1. Type, Lilita One display and Rubik UI
+
+- Approved 2026-09-20: headlines, titles, and display words use bundled **Lilita One** at existing point sizes. Body text, controls, captions, and UI labels stay **Rubik**.
+- Live timers and changing counters retain Rubik's tabular numerals. Lilita One has proportional digits and no tabular-number feature.
+- Lilita One has one static weight; do not synthesize bold/black variants. The older one-family rules below are superseded for these display roles.
 
 - All text uses **Rubik** via `auraFont(.display | .body, size, weight)`. Bold
   (700) is the weight ceiling for the whole app.
@@ -59,6 +63,8 @@ Do not paste a raw number or hex into a feature view.
   the body.
 
 ## 3. Radius + corners
+
+- Approved 2026-09-21: custom close, back, settings, help, and delete controls use the `AuraWood*` illustrated assets through `CircleIconButton` / `WoodButtonArtwork`; Create Your Own uses `AuraWoodAdd`. Symbols are centered on the front wooden face, excluding the bottom edge and shadow. Preserve at least 44 × 44pt hit areas, accessibility labels, and existing actions. Arithmetic steppers and system controls retain their existing treatment.
 
 - `Theme.Radius`: `micro 6 · tile 8 · field 12 · card 16 · hero 24 · panel 32 ·
   sheet 38 · pill 999`. Pick by role (a field ≤ a card ≤ a hero tile).

@@ -130,7 +130,7 @@ struct ProofFailureView: View {
             }
         }
         .onAppear {
-            Haptics.notify(.warning)
+            Haptics.notify(.error)
             guard !reduceMotion else { appeared = true; return }
             withAnimation(.spring(response: 0.5, dampingFraction: 0.62)) { appeared = true }
         }

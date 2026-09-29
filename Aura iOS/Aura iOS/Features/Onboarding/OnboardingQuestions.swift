@@ -446,7 +446,7 @@ struct OnbScrollSliderView: View {
                 VStack(spacing: Theme.Spacing.xxl) {
                     // One line, number and unit the same size and weight, no "a day".
                     Text(flow.hours >= 12 ? "12+ hours" : "\(flow.hoursText) hours")
-                        .auraFont(.display, 44, .heavy)
+                        .auraFont(.body, 44, .heavy)
                         .foregroundStyle(.white)
                         .monospacedDigit()
                         .contentTransition(.numericText())

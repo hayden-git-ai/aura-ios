@@ -53,7 +53,7 @@ struct OnbReclaimView: View {
                     .padding(.horizontal, Theme.Spacing.xl)
 
                 Text("+\(hourCounter)h")
-                    .auraFont(.display, 76, .heavy)
+                    .auraFont(.body, 76, .heavy)
                     .monospacedDigit()
                     .contentTransition(.numericText())
                     .foregroundStyle(.white)
@@ -132,7 +132,7 @@ private struct ReclaimThingCard: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("\(thing.count)+")
-                    .auraFont(.display, SheetType.heroCompact, .heavy)
+                    .auraFont(.body, SheetType.heroCompact, .heavy)
                     .foregroundStyle(.white)
                     .monospacedDigit()
                 Text(thing.label)

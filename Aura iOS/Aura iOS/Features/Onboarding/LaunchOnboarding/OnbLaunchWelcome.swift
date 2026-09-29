@@ -69,7 +69,10 @@ struct OnbLaunchWelcome: View {
                 VStack(spacing: Theme.Spacing.m) {
                     LightPrimaryButton(title: "Get started",
                                        face: .white, textColor: LightSheet.title, shade: LightSheet.whiteShadeOnColour) { flow.advance() }
-                    Button { flow.onSignInRequested() } label: {
+                    Button {
+                        Haptics.impact(.light)
+                        flow.onSignInRequested()
+                    } label: {
                         Text("Already have an account? \(Text("Sign in").font(Typography.body(size: 15, weight: .bold)).foregroundStyle(.white).underline())")
                             .font(Typography.body(size: 15, weight: .semibold))
                             .foregroundStyle(.white.opacity(0.9))

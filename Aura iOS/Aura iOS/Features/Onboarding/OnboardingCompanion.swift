@@ -264,7 +264,10 @@ struct OnbHandoffView: View {
                 VStack(spacing: 0) {
                     notification
                         .padding(.horizontal, Theme.Spacing.l)
-                        .onTapGesture { flow.advance() }
+                        .onTapGesture {
+                            Haptics.impact(.light)
+                            flow.advance()
+                        }
                         .transition(.move(edge: .top).combined(with: .opacity))
 
                     HStack(spacing: 8) {

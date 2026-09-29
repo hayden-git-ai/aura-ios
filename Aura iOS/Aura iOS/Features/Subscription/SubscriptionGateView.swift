@@ -29,6 +29,8 @@ struct SubscriptionGateView: View {
     @State private var working = false
     @State private var presentationPending = false
     private let analytics = PaywallAnalytics()
+    private let holdingIconSide: CGFloat = 112
+    private let holdingIconRadius: CGFloat = 28
 
     var body: some View {
         #if canImport(SuperwallKit)
@@ -61,30 +63,53 @@ struct SubscriptionGateView: View {
             analytics.paywallPresented(placement: placement)
         }
         handler.onDismiss { _, _ in presentationPending = false }
-        handler.onError { _ in presentationPending = false }
+        handler.onError { _ in
+            presentationPending = false
+            Haptics.notify(.error)
+        }
         handler.onSkip { _ in presentationPending = false }
         Superwall.shared.register(placement: placement, handler: handler) {
             presentationPending = false
+            Haptics.notify(.success)
             Task { await store.refreshEntitlement() }
         }
     }
 
     private var holding: some View {
         ZStack {
-            LightSheet.bg.ignoresSafeArea()
-            VStack(spacing: Theme.Spacing.xl) {
+            HomeBackground()
+
+            VStack(spacing: 0) {
                 Spacer()
-                VStack(spacing: Theme.Spacing.m) {
-                    Text("Unlock Aura")
+
+                VStack(spacing: Theme.Spacing.l) {
+                    Image("AuraAppIcon")
+                        .resizable()
+                        .interpolation(.high)
+                        .scaledToFit()
+                        .frame(width: holdingIconSide, height: holdingIconSide)
+                        .clipShape(RoundedRectangle(cornerRadius: holdingIconRadius, style: .continuous))
+                        .shadow(color: .black.opacity(0.22), radius: 12, y: 6)
+
+                    Text(presentationPending ? "Opening plans..." : "Unlock Aura")
                         .auraFont(.display, SheetType.hero, .bold)
-                        .foregroundStyle(LightSheet.title)
-                    Text("Keep every app earned, not given. 🦊")
+                        .foregroundStyle(.white)
+                        .shadow(color: .black.opacity(0.45), radius: 8, y: 2)
+
+                    Text("Choose a plan to start using Aura.")
                         .auraFont(.body, SheetType.cardTitle, .regular)
-                        .foregroundStyle(LightSheet.subtitleDark)
+                        .foregroundStyle(.white.opacity(0.92))
                         .multilineTextAlignment(.center)
+
+                    if presentationPending {
+                        ProgressView()
+                            .tint(.white)
+                    }
                 }
                 .padding(.horizontal, Theme.Spacing.xl)
+
                 Spacer()
+
                 VStack(spacing: Theme.Spacing.m) {
                     LightPrimaryButton(title: "See plans", enabled: !working && !presentationPending) {
                         presentPaywall()
@@ -96,16 +121,17 @@ struct SubscriptionGateView: View {
                         Task {
                             let restored = await store.restorePurchase()
                             analytics.restoreResult(restored ? .restored : .failed, source: "subscription_gate")
+                            Haptics.notify(restored ? .success : .error)
                             working = false
                         }
                     }
                     .auraFont(.body, SheetType.cardTitle, .semibold)
-                    .foregroundStyle(LightSheet.title)
+                    .foregroundStyle(.white)
                     .buttonStyle(.plain)
                     .disabled(working || presentationPending)
                 }
                 .padding(.horizontal, Theme.Spacing.xl)
-                .padding(.bottom, Theme.Spacing.l)
+                .padding(.bottom, Theme.Spacing.xxl)
             }
         }
     }
@@ -136,6 +162,8 @@ struct SubscriptionGateView: View {
                             working = true
                             let subscribed = await store.subscribe()
                             analytics.purchaseResult(subscribed ? .success : .failed, productID: "default")
+                            // The legacy Bool result also includes cancellation.
+                            if subscribed { Haptics.notify(.success) }
                             working = false
                         }
                     }
@@ -145,6 +173,7 @@ struct SubscriptionGateView: View {
                             working = true
                             let restored = await store.restorePurchase()
                             analytics.restoreResult(restored ? .restored : .failed, source: "fallback_subscription_gate")
+                            Haptics.notify(restored ? .success : .error)
                             working = false
                         }
                     }

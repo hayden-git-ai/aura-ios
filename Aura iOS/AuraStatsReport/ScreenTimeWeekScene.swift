@@ -142,21 +142,27 @@ struct ScreenTimeWeekView: View {
     var body: some View {
         let _ = Self.fontsReady
 
-        if week.allSatisfy({ $0.totalMinutes == 0 }) {
-            // Authorization not granted, or no data for the window yet. Says so
-            // rather than drawing an empty chart that looks like a zero.
-            Text("No Screen Time data yet.")
-                .auraFont(.body, RowType.label, .medium)
-                .foregroundStyle(LightSheet.subtitle)
-                .frame(maxWidth: .infinity, alignment: .center)
-                .padding(.vertical, Theme.Spacing.xxl)
-        } else {
-            ScreenTimeSummary(week: week, selected: $selected, plain: true)
-                .onAppear {
-                    selected = week.firstIndex { Calendar.current.isDateInToday($0.date) }
-                        ?? week.indices.last
-                        ?? 0
-                }
+        Group {
+            if week.allSatisfy({ $0.totalMinutes == 0 }) {
+                // Authorization not granted, or no data for the window yet. Says so
+                // rather than drawing an empty chart that looks like a zero.
+                Text("No Screen Time data yet.")
+                    .auraFont(.body, RowType.label, .medium)
+                    .foregroundStyle(LightSheet.subtitle)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, Theme.Spacing.xxl)
+            } else {
+                ScreenTimeSummary(week: week, selected: $selected, plain: true)
+                    .onAppear {
+                        selected = week.firstIndex { Calendar.current.isDateInToday($0.date) }
+                            ?? week.indices.last
+                            ?? 0
+                    }
+            }
         }
+        // Cover the host's loading placeholders once the extension has data
+        // (including an empty result), without exposing report values to it.
+        .frame(maxWidth: .infinity, minHeight: 320, maxHeight: 320)
+        .background(Color.white)
     }
 }

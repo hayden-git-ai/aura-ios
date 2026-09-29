@@ -14,21 +14,10 @@ import UIKit
 /// your bill.
 final class LiveProofVerifier: ProofVerifier {
     private let endpoint: URL
-    /// What to answer when nothing could judge the photo.
-    ///
-    /// Defaults to passing, and that's a product decision worth stating: the
-    /// user has already done the habit and is standing there holding their
-    /// phone. Refusing to pay them for our outage is the worst trade available
-    /// — it costs a few minutes of screen time and buys a person who no longer
-    /// believes the app works. Every such verdict is flagged `isFallback`, so
-    /// they can be counted, and tightened later if anyone learns to farm them
-    /// by turning off wifi.
-    private let fallbackPasses: Bool
     private let session: URLSession
 
-    init(endpoint: URL, fallbackPasses: Bool = true, timeout: TimeInterval = 15) {
+    init(endpoint: URL, timeout: TimeInterval = 15) {
         self.endpoint = endpoint
-        self.fallbackPasses = fallbackPasses
 
         let configuration = URLSessionConfiguration.ephemeral
         configuration.timeoutIntervalForRequest = timeout
@@ -67,11 +56,7 @@ final class LiveProofVerifier: ProofVerifier {
             guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
                 return fallback
             }
-            let verdict = try JSONDecoder().decode(Response.self, from: data)
-            return ProofVerdict(passed: verdict.passed,
-                                reason: verdict.reason.isEmpty ? nil : verdict.reason,
-                                fix: (verdict.fix ?? "").isEmpty ? nil : verdict.fix,
-                                isBlocked: verdict.blocked ?? false)
+            return try Self.decodeVerdict(from: data)
         } catch {
             // Offline, timed out, endpoint down, response we couldn't read.
             // All the same thing from here: nothing judged the photo.
@@ -79,10 +64,22 @@ final class LiveProofVerifier: ProofVerifier {
         }
     }
 
-    /// No reason, deliberately. A fallback has nothing to report, and writing
-    /// one would be putting words in a verifier's mouth that never ran.
+    static func decodeVerdict(from data: Data) throws -> ProofVerdict {
+        let verdict = try JSONDecoder().decode(Response.self, from: data)
+        let blocked = verdict.blocked ?? false
+        return ProofVerdict(passed: verdict.passed && !blocked,
+                            reason: verdict.reason.isEmpty ? nil : verdict.reason,
+                            fix: (verdict.fix ?? "").isEmpty ? nil : verdict.fix,
+                            isBlocked: blocked)
+    }
+
+    /// A retryable unavailable result. It does not describe the photo because
+    /// no verifier actually judged it.
     private var fallback: ProofVerdict {
-        ProofVerdict(passed: fallbackPasses, isFallback: true)
+        ProofVerdict(passed: false,
+                     reason: "i couldn't check that photo right now.",
+                     fix: "try again when Aura can verify it.",
+                     isFallback: true)
     }
 
     /// Shared key the endpoint checks before it will spend anything on Gemini.

@@ -95,6 +95,7 @@ struct FocusTimerActiveView: View {
         .background { LockInBackground() }
         .contentShape(Rectangle())
         .onTapGesture {
+            Haptics.impact(.light)
             withAnimation(.easeInOut(duration: 0.35)) {
                 isChromeVisible.toggle()
             }
@@ -162,9 +163,13 @@ struct FocusTimerActiveView: View {
         // Resuming, not starting, when the store already has one: coming back
         // to a session that outlived this screen must not restart its clock.
         if store.activeFocusSession == nil {
-            store.startFocusSession(lengthMinutes: config.lengthMinutes,
+            guard store.startFocusSession(lengthMinutes: config.lengthMinutes,
                                     isUntimed: untimed,
-                                    earnRate: config.earnRate)
+                                    earnRate: config.earnRate) else {
+                Haptics.notify(.error)
+                onEndEarly()
+                return
+            }
         }
         now = .now
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in

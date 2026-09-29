@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 /// The celebrating fox on every success screen — a run of short clips played in
 /// order and looped: cute → flexing → smile.
@@ -45,5 +46,80 @@ struct SuccessCelebrationArt: View {
                 .offset(x: Self.bodyCentreNudge, y: -12 + foxYOffset)
         }
         .frame(width: Self.foxSize, height: Self.foxSize)
+    }
+}
+
+/// The looping earn-state fox used while a habit is being configured. The
+/// converted HEVC-alpha clip stays hardware-decoded and pauses when its host
+/// leaves the window or the scene becomes inactive; reduced motion gets a still.
+struct EarnFoxPlaybackView: View {
+    static let defaultSize: CGFloat = 260
+    var size: CGFloat = Self.defaultSize
+    var shadowOpacity: Double = 0.12
+    var shadowWidthRatio: CGFloat = 0.51
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
+
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            Ellipse()
+                .fill(Color.black.opacity(shadowOpacity))
+                .frame(width: size * shadowWidthRatio, height: size * 0.136)
+                .offset(y: -size * 0.05 - 2)
+
+            if reduceMotion {
+                if let path = Bundle.main.path(forResource: "EarnEntryPoster", ofType: "png"),
+                   let poster = UIImage(contentsOfFile: path) {
+                    Image(uiImage: poster)
+                        .resizable()
+                        .interpolation(.high)
+                        .scaledToFit()
+                        .frame(width: size, height: size)
+                }
+            } else {
+                LoopingVideoView(resource: "EarnEntryLoop", ext: "mov",
+                                 isPlaying: scenePhase == .active)
+                    .frame(width: size, height: size)
+            }
+        }
+        .frame(width: size, height: size)
+        .accessibilityHidden(true)
+    }
+}
+
+struct EarnMethodHero: View {
+    let title: String
+    let subtitle: String
+    var foxOffset: CGFloat = 0
+
+    var body: some View {
+        VStack(spacing: Theme.Spacing.s) {
+            EarnFoxPlaybackView()
+                .offset(y: foxOffset)
+            Text(title)
+                .auraFont(.display, SheetType.title, .bold)
+                .foregroundStyle(.white)
+            Text(subtitle)
+                .auraFont(.body, SheetType.subtitle, .regular)
+                .foregroundStyle(LightSheet.onColour)
+                .multilineTextAlignment(.center)
+        }
+        .padding(.top, FocusHero.chromeClearance)
+    }
+}
+
+/// Shared with the illustrated Earn cards: black display lettering, white
+/// sticker outline and the achievement numeral shadow.
+struct EarnOutlinedTitle: View {
+    let text: String
+    let font: UIFont
+
+    var body: some View {
+        StrokedNumber(text: text, font: font, fill: .black, stroke: .white,
+                      outlineWidth: font.pointSize * StrokedNumeral.outlineRatio)
+            .fixedSize()
+            .shadow(color: .black.opacity(LightSheet.Achievement.numeralShadowOpacity),
+                    radius: LightSheet.Achievement.numeralShadowRadius,
+                    y: LightSheet.Achievement.numeralShadowDrop)
     }
 }

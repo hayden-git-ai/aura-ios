@@ -128,6 +128,9 @@ def regenerate_picker():
     """
     if not PICKER.exists():
         return
+    if "Curated active sticker assets" in PICKER.read_text():
+        print("Picker is curated: review new assets for usage, duplicates, alpha bounds and category before adding.")
+        return
     names = {d.name[: -len(".imageset")] for d in CATALOG.iterdir()
              if d.name.endswith(".imageset")}
     usable = {n for n in names if n.startswith("Fox") and not n.startswith("tired_fox")}

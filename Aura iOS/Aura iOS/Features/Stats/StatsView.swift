@@ -72,7 +72,7 @@ struct StatsView: View {
             WallOfWinsSheet()
         }
         // Once the account is a week old, snapshot this week's screen-time total
-        // as the baseline the Time Saved card measures against. No-op after the
+        // as the baseline the Profile time-saved statistic measures against. No-op after the
         // first capture. (Fed from here because the store has no screen-time
         // source of its own.)
         .onAppear {
@@ -114,59 +114,39 @@ struct StatsView: View {
 
     // MARK: - Achievements (horizontal scroll)
 
-    /// One stat framed as an achievement — its all-time value, a short label, the
-    /// card's top→bottom colour pair, and an icon sticker that bleeds off the card
-    /// behind it (nil until its art is supplied). The card colour matches its
-    /// icon's family so the low-opacity sticker blends but stays visible.
+    /// The illustration and metric have separate areas so neither obscures the other.
     private struct AchievementItem {
         let value: String
         let label: String
-        let top: Color
-        let bottom: Color
+        let color: LightSheet.Achievement.Palette
         let sticker: String?
+        var backgroundImage: String? = nil
     }
 
-    /// The six achievements, all-time. Time Saved is appended only once there's a
-    /// baseline week to compare against. Stickers arrive one batch at a time; a
-    /// card with no sticker yet still shows its colour + burst.
+    private enum AchievementLayout {
+        static let width: CGFloat = 200
+        static let height: CGFloat = 236
+        static let artworkSize: CGFloat = 152
+        static let artworkBleed: CGFloat = 12
+        static let numeralSize: CGFloat = 44
+        static let discSize: CGFloat = 210
+        static let discBleed: CGFloat = 50
+
+    }
+
     private var achievements: [AchievementItem] {
-        var items: [AchievementItem] = [
-            AchievementItem(value: "\(store.lifetimeEarnedMinutes)", label: "coins earned",
-                            top: Color(hex: "E8A317"), bottom: Color(hex: "B26A00"),
-                            sticker: nil),                                 // chest — pending
-            AchievementItem(value: "\(store.streak.longestStreak)", label: "best streak",
-                            top: Color(hex: "FF7A33"), bottom: Color(hex: "D0491A"),
-                            sticker: "Achievement_BestStreak"),
-            AchievementItem(value: "\(store.lifetimeHealthyHabits)", label: "healthy habits",
-                            top: Color(hex: "E8453B"), bottom: Color(hex: "B22A22"),
-                            sticker: nil),                                 // apple — pending
-            AchievementItem(value: "\(store.lifetimeReps)", label: "reps completed",
-                            top: Color(hex: "3BA9F5"), bottom: Color(hex: "1E5FB0"),
-                            sticker: nil),                                 // diamond — pending
-            AchievementItem(value: focusValueLabel, label: "time focused",
-                            top: Color(hex: "C8324A"), bottom: Color(hex: "8A1B2E"),
-                            sticker: "Achievement_TimeFocused"),
+        [
+            AchievementItem(value: "\(store.streak.longestStreak)", label: "Best Streak",
+                            color: LightSheet.Achievement.streak, sticker: "AchievementFoxStreak", backgroundImage: "AchievementBackgroundStreak"),
+            AchievementItem(value: "\(store.lifetimeHealthyHabits)", label: "Healthy Habits",
+                            color: LightSheet.Achievement.habits, sticker: "AchievementFoxHabits", backgroundImage: "AchievementBackgroundHabits"),
+            AchievementItem(value: "\(store.lifetimeReps)", label: "Reps Completed",
+                            color: LightSheet.Achievement.reps, sticker: "AchievementFoxReps", backgroundImage: "AchievementBackgroundReps"),
+            AchievementItem(value: focusValueLabel, label: "Time Focused",
+                            color: LightSheet.Achievement.focus, sticker: "AchievementFoxFocus", backgroundImage: "AchievementBackgroundFocus"),
+            AchievementItem(value: "\(store.lifetimeEarnedMinutes)", label: "Coins Earned",
+                            color: LightSheet.Achievement.coins, sticker: "AchievementFoxCoins", backgroundImage: "AchievementBackgroundCoins"),
         ]
-        let weekTotal = screenTimeWeek.reduce(0) { $0 + $1.totalMinutes }
-        if hasScreenTimeData,
-           let saved = store.timeSavedMinutes(currentWeeklyMinutes: weekTotal) {
-            items.append(AchievementItem(value: savedTimeLabel(saved), label: "time saved",
-                                         top: Color(hex: "FF5E8A"), bottom: Color(hex: "C22E5A"),
-                                         sticker: nil))                    // heart — pending
-        }
-        return items
-    }
-
-    /// Time saved as a single number that scales up: minutes, then hours, days,
-    /// months, years.
-    private func savedTimeLabel(_ minutes: Int) -> String {
-        if minutes < 60 { return "\(minutes)m" }
-        let hours = minutes / 60
-        if hours < 24 { return "\(hours)h" }
-        let days = hours / 24
-        if days < 30 { return "\(days)d" }
-        let months = days / 30
-        return months < 12 ? "\(months)mo" : "\(days / 365)y"
     }
 
     private var achievementsSection: some View {
@@ -196,64 +176,78 @@ struct StatsView: View {
         return m >= 60 ? "\(m / 60)h" : "\(m)m"
     }
 
+    private func achievementNumberFont(_ value: String) -> UIFont {
+        let font = Typography.displayUIFont(size: AchievementLayout.numeralSize, weight: .black, tabular: true)
+        let measuredWidth = (value as NSString).size(withAttributes: [.font: font]).width
+        let availableWidth = AchievementLayout.width - Theme.Spacing.m * 2
+        let outlinedWidth = measuredWidth + font.pointSize * StrokedNumeral.outlineRatio * 2
+        return font.withSize(font.pointSize * min(1, availableWidth / max(outlinedWidth, 1)))
+    }
+
     private func achievementCard(_ a: AchievementItem) -> some View {
-        let w: CGFloat = 172
-        // The number is the hero, centred over the coloured field with the icon
-        // sticker bleeding up behind it.
-        return VStack(spacing: 4) {
-            // Sticker numeral: black fill, white contour, soft drop shadow.
-            StrokedNumber(text: a.value,
-                          font: Typography.displayUIFont(size: SheetType.hero, weight: .black, tabular: true),
-                          fill: .black,
-                          stroke: .white,
-                          outlineWidth: 3)
-                .fixedSize()
-                .shadow(color: .black.opacity(0.3), radius: 4, y: 2)
-            Text(a.label)
-                .auraFont(.body, 15, .bold)
-                .foregroundStyle(.white)
-                .lineLimit(2)
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
-                .shadow(color: .black.opacity(0.25), radius: 3, y: 1)
-        }
-        .padding(.horizontal, Theme.Spacing.m)
-        .frame(width: w, height: w * 1.18)
-        .background {
-            ZStack {
-                // Base colour, top → bottom.
-                LinearGradient(colors: [a.top, a.bottom], startPoint: .top, endPoint: .bottom)
-
-                // Rays + rings fanning up from the bottom-centre, behind the icon.
-                AchievementBurst()
-
-                // The icon: oversized, anchored to the bottom and pushed down so it
-                // bleeds off the left / right / bottom edges with its top landing
-                // ~¾ up the card. Low opacity — a watermark that blends into the
-                // card colour but stays readable.
-                if let sticker = a.sticker {
-                    Image(sticker)
-                        .resizable()
-                        .interpolation(.high)
-                        .scaledToFit()
-                        .frame(width: w * 1.16, height: w * 1.16)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-                        .offset(y: w * 0.26)
-                        .opacity(0.55)
-                }
-
-                // Darker overlay, bottom-weighted (the icon is densest there), so
-                // the number + label keep full contrast over it.
-                LinearGradient(colors: [.black.opacity(0.10), .black.opacity(0.40)],
-                               startPoint: .top, endPoint: .bottom)
+        ZStack(alignment: .bottom) {
+            if let backgroundImage = a.backgroundImage {
+                Image(backgroundImage)
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFill()
+                    .frame(width: AchievementLayout.width, height: AchievementLayout.height)
+                    .clipped()
+                    .accessibilityHidden(true)
+            } else {
+                LinearGradient(colors: [a.color.top, a.color.bottom],
+                               startPoint: .topLeading, endPoint: .bottomTrailing)
+                Circle()
+                    .fill(a.color.bottom.opacity(0.45))
+                    .frame(width: AchievementLayout.discSize, height: AchievementLayout.discSize)
+                    .offset(y: AchievementLayout.discBleed)
             }
+
+            if let sticker = a.sticker {
+                Image(sticker)
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFit()
+                    .frame(width: AchievementLayout.artworkSize,
+                           height: AchievementLayout.artworkSize)
+                    // Extend the original PNG's straight body edge below the mask.
+                    .offset(y: AchievementLayout.artworkBleed)
+                    .accessibilityHidden(true)
+            }
+
+            VStack(spacing: 0) {
+                StrokedNumber(text: a.value, font: achievementNumberFont(a.value),
+                              fill: .black, stroke: .white,
+                              outlineWidth: achievementNumberFont(a.value).pointSize * StrokedNumeral.outlineRatio)
+                    .fixedSize()
+                    .shadow(color: .black.opacity(LightSheet.Achievement.numeralShadowOpacity),
+                            radius: LightSheet.Achievement.numeralShadowRadius,
+                            y: LightSheet.Achievement.numeralShadowDrop)
+                Text(a.label)
+                    .auraFont(.body, SheetType.cardTitle, .bold)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .shadow(color: .white, radius: 0, x: LightSheet.Achievement.labelEdgeWidth)
+                    .shadow(color: .white, radius: 0, x: -LightSheet.Achievement.labelEdgeWidth)
+                    .shadow(color: .white, radius: 0, y: LightSheet.Achievement.labelEdgeWidth)
+                    .shadow(color: .white, radius: 0, y: -LightSheet.Achievement.labelEdgeWidth)
+                    .padding(.top, -Theme.Spacing.xs)
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(.black)
+            .padding(.horizontal, Theme.Spacing.m)
+            .padding(.top, Theme.Spacing.m)
         }
-        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
-        // The Apps lane-card depth. The horizontal scroll clips to its bounds, so
-        // the strip pads itself vertically to give this shadow room — otherwise
-        // it's sliced off flush at the card edges and reads as a hard line.
-        .shadow(color: .black.opacity(0.16), radius: 20, y: 11)
-        .shadow(color: .black.opacity(0.10), radius: 4, y: 2)
+        .frame(width: AchievementLayout.width, height: AchievementLayout.height)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.hero, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: Theme.Radius.hero, style: .continuous)
+                .strokeBorder(LinearGradient(colors: [.white.opacity(0.6), .white.opacity(0.05)],
+                                             startPoint: .top, endPoint: .bottom), lineWidth: 1)
+        }
+        .illustratedCardShadow()
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(a.label), \(a.value), all time")
     }
 
     // MARK: - This week (Reference A, repackaged)
@@ -296,19 +290,27 @@ struct StatsView: View {
             // release build, Apple renders real Device Activity data inside
             // the report extension; this host never receives its numbers.
 #if DEBUG
-            ScreenTimeSummary(week: screenTimeWeek, selected: $selectedDay, plain: true)
+            if screenTimeWeek.isEmpty {
+                StatsLoadingState()
+            } else {
+                ScreenTimeSummary(week: screenTimeWeek, selected: $selectedDay, plain: true)
+            }
 #else
-            DeviceActivityReport(
-                .screenTimeWeek,
-                filter: DeviceActivityFilter(
-                    segment: .hourly(during: ScreenTimeReportWindow.currentWeek()),
-                    users: .all,
-                    devices: .all
+            ZStack {
+                StatsLoadingState()
+                DeviceActivityReport(
+                    .screenTimeWeek,
+                    filter: DeviceActivityFilter(
+                        segment: .hourly(during: ScreenTimeReportWindow.currentWeek()),
+                        users: .all,
+                        devices: .all
+                    )
                 )
-            )
-            // A report view is hosted in a separate extension process and has
-            // no useful height for this outer ScrollView to infer.
-            .frame(minHeight: 320)
+                // A report view is hosted in a separate extension process and has
+                // no useful height for this outer ScrollView to infer.
+                .frame(height: 320)
+            }
+            .frame(height: 320)
 #endif
         }
         .padding(.top, headerTopInset)
@@ -351,9 +353,9 @@ struct StatsView: View {
             }
 
             HStack(spacing: 0) {
-                journeyStat("Stats90DayCalendar", "Day \(store.detoxDay) of \(Journey.board)")
+                journeyStat("Past90DaysCalendar", "Day \(store.detoxDay) of \(Journey.board)")
                 Spacer(minLength: Theme.Spacing.s)
-                journeyStat("StatsHabitsCompleted",
+                journeyStat("Past90DaysVerified",
                             "\(store.boardHabitsCompleted) habit\(store.boardHabitsCompleted == 1 ? "" : "s") completed")
             }
         }
@@ -396,7 +398,7 @@ struct StatsView: View {
         Color.clear
             .aspectRatio(1, contentMode: .fit)
             .overlay(
-                Image("StreakFireIcon")
+                Image("StreakFlame")
                     .resizable()
                     .interpolation(.high)
                     .scaledToFit()
@@ -512,49 +514,18 @@ struct StatsView: View {
 
 }
 
-/// Rays and concentric rings fanning up from the bottom-centre — the achievement
-/// cards' own take on the lane cards' burst (a fresh build, not a reuse). Low
-/// white opacity, so it reads as texture behind the icon, never as foreground.
-private struct AchievementBurst: View {
-    /// Bottom-centre, so the fan blooms up behind the icon and its lower half
-    /// falls off the card.
-    private let origin = UnitPoint(x: 0.5, y: 1.0)
-
+private struct StatsLoadingState: View {
     var body: some View {
-        ZStack {
-            // Concentric rings rippling up from the origin.
-            Rectangle()
-                .fill(RadialGradient(gradient: Gradient(stops: ringStops),
-                                     center: origin, startRadius: 0, endRadius: 210))
-            // Angular rays, radial-masked into the same origin so they dissolve
-            // outward rather than reaching the corners.
-            Rectangle()
-                .fill(AngularGradient(gradient: Gradient(stops: rayStops), center: origin))
-                .mask(
-                    RadialGradient(gradient: Gradient(colors: [.white, .white, .clear]),
-                                   center: origin, startRadius: 0, endRadius: 200)
-                )
+        VStack(spacing: Theme.Spacing.m) {
+            ProgressView()
+                .controlSize(.regular)
+                .tint(LightSheet.blue)
+            Text("Loading Screen Time…")
+                .auraFont(.body, RowType.label, .semibold)
+                .foregroundStyle(LightSheet.subtitleDark)
         }
-        .allowsHitTesting(false)
-    }
-
-    private var ringStops: [Gradient.Stop] {
-        stops(count: 9, alpha: 0.06)
-    }
-    private var rayStops: [Gradient.Stop] {
-        stops(count: 36, alpha: 0.07)
-    }
-
-    /// Alternating white / clear bands, evenly spaced — one shared builder for
-    /// both the rings (radial) and the rays (angular).
-    private func stops(count: Int, alpha: Double) -> [Gradient.Stop] {
-        var out: [Gradient.Stop] = []
-        for i in 0..<count {
-            let c: Color = i % 2 == 0 ? Color.white.opacity(alpha) : .clear
-            out.append(.init(color: c, location: Double(i) / Double(count)))
-            out.append(.init(color: c, location: Double(i + 1) / Double(count)))
-        }
-        return out
+        .frame(maxWidth: .infinity, minHeight: 320)
+        .accessibilityLabel("Loading screen-time stats")
     }
 }
 

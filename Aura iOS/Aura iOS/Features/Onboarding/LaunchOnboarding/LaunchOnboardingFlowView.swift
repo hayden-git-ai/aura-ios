@@ -2,7 +2,7 @@
 //  LaunchOnboardingFlowView.swift
 //  Aura iOS
 //
-//  Container for the SHORTENED launch onboarding (12 screens). Renders the
+//  Container for the production launch onboarding. Renders the
 //  independent `OnbLaunch*` copies so they can be redesigned without touching the
 //  full v2 flow (`OnboardingFlowView`, still present and unchanged). Which screens
 //  actually appear is decided by `OnboardingFlow.steps` (= `.launchSteps`); the
@@ -18,28 +18,50 @@ struct LaunchOnboardingFlowView: View {
         Group {
             switch flow.step {
             case .welcome:  OnbLaunchWelcome()
-            case .meet:     OnbLaunchMeet()
-            case .name:     OnbLaunchName()
             case .qGoal:    OnbLaunchGoal()
-            case .qSlider:  OnbLaunchSlider()
-            case .loopDemo: OnbLaunchLoopDemo()
-            case .demoFreeze:
-                OnbLaunchDemoScreen(showBack: false,
-                                    title: "Block Distracting Apps",
-                                    subtext: "To get them back you need to spend Aura Coins.",
-                                    cta: "Next")
-            case .demoEarn:
-                OnbLaunchDemoScreen(showBack: false,
-                                    title: "Earn Aura Coins",
-                                    subtext: "There are 30+ unique ways to earn Aura Coins & you can even create your own!",
-                                    cta: "Next")
-            case .demoSpend:
-                OnbLaunchDemoScreen(showBack: false,
-                                    title: "Buy Screen Time",
-                                    subtext: "Use Aura Coins to purchase screen time and use the apps you blocked.",
-                                    cta: "Continue")
+            case .qPersona:
+                OnbLaunchSingleSelect(
+                    progress: flow.progress,
+                    question: "What is your gender?",
+                    options: [("Male", "👨"),
+                              ("Female", "👩"),
+                              ("Other", "🧑")],
+                    key: \.persona
+                )
+            case .age:      OnbLaunchAge()
+            case .qDoomProfile: OnbLaunchComparison()
+            case .name:     OnbLaunchName()
+            case .qFeelings:
+                OnbLaunchMultiSelect(
+                    progress: flow.progress,
+                    question: "How does your screen time affect you most?",
+                    options: [
+                        ("No focus / procrastination", "😵‍💫"),
+                        ("Anxiety / overstimulation", "🤯"),
+                        ("Bad sleep", "😴"),
+                        ("Productivity loss", "📉"),
+                        ("I feel mentally fried", "🫠"),
+                        ("Less time with friends / family", "👥"),
+                    ],
+                    key: \.feelings
+                )
+            case .qWorstTime:
+                OnbLaunchSingleSelect(
+                    progress: flow.progress,
+                    question: "When do you usually scroll the most?",
+                    options: [
+                        ("First thing in the morning", "🌅"),
+                        ("During the day", "☀️"),
+                        ("Evenings", "🌙"),
+                        ("Honestly, all day", "📱"),
+                        ("Not sure", "🤷"),
+                    ],
+                    key: \.worstTime
+                )
             case .qHabits:     OnbLaunchHabits()
+            case .qLoading:    OnbLaunchLoading()
             case .qCustomPlan: OnbLaunchCustomPlan()
+            case .qReviews:    OnbLaunchReviews()
             case .qCommit:     OnbLaunchCommit()
             // Steps outside the launch sequence never become `step`; render nothing.
             default:           Color.clear

@@ -1,6 +1,12 @@
 {
-  "images" : [
-    { "filename" : "InterventionMirrorCheck.png", "idiom" : "universal" }
+  "images": [
+    {
+      "filename": "InterventionMirrorCheck.png",
+      "idiom": "universal"
+    }
   ],
-  "info" : { "author" : "xcode", "version" : 1 }
+  "info": {
+    "author": "xcode",
+    "version": 1
+  }
 }

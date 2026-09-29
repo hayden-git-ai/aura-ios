@@ -89,8 +89,7 @@ struct LaneCard: View {
         .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.hero, style: .continuous))
         // Layered depth so the cards lift off the ground and read as chunky game
         // pieces: a soft ambient shadow plus a tighter contact shadow.
-        .shadow(color: .black.opacity(0.16), radius: 20, y: 11)
-        .shadow(color: .black.opacity(0.10), radius: 4, y: 2)
+        .illustratedCardShadow()
     }
 
     // MARK: - Colour + burst

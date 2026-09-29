@@ -5,13 +5,8 @@
 
 import SwiftUI
 
-/// A glyph on a circular face — every X, back arrow, gear, trash and edit
-/// pencil in the app.
-///
-/// There were fourteen of these written out by hand, which is how one 44pt
-/// frame ended up carrying 16 bold, 17 semibold and 18 heavy glyphs at the same
-/// time. The three sizes that exist are grades here, so a new button picks one
-/// rather than inventing a fourth.
+/// Shared corner chrome. Approved wooden artwork carries its own glyph and depth;
+/// unrelated controls retain their existing circular treatment.
 struct CircleIconButton: View {
     enum Grade {
         /// A remove badge pinned to a grid tile.
@@ -34,7 +29,7 @@ struct CircleIconButton: View {
             switch self {
             case .mini: 26
             case .badge: 32
-            case .chrome: 36
+            case .chrome: 40
             case .stepper: 44
             }
         }
@@ -43,7 +38,7 @@ struct CircleIconButton: View {
             switch self {
             case .mini: 13
             case .badge: 13
-            case .chrome: 15
+            case .chrome: 16
             case .stepper: 16
             }
         }
@@ -95,14 +90,17 @@ struct CircleIconButton: View {
     @ViewBuilder
     var body: some View {
         if bounces {
-            button.buttonStyle(PressBounceStyle())
+            button.buttonStyle(PressBounceStyle(hapticsEnabled: false))
         } else {
             button.buttonStyle(.plain)
         }
     }
 
     private var button: some View {
-        Button(action: action) {
+        Button {
+            Haptics.impact(.light)
+            action()
+        } label: {
             glyph
                 // The face keeps its designed size; the tap area doesn't. A
                 // 36pt X is right visually and 8pt short of Apple's minimum,
@@ -115,7 +113,9 @@ struct CircleIconButton: View {
 
     @ViewBuilder
     private var glyph: some View {
-        if let glyphImage {
+        if let role = woodenRole {
+            WoodButtonArtwork(role: role, diameter: grade.diameter)
+        } else if let glyphImage {
             // A flat glyph image at roughly the SF glyph's size, centred on the
             // disc. Its own colour, so `glyphColor` is not applied.
             Image(glyphImage)
@@ -154,6 +154,20 @@ struct CircleIconButton: View {
                 .rotationEffect(.degrees(rotation))
                 .frame(width: grade.diameter, height: grade.diameter)
                 .background(fill, in: Circle())
+        }
+    }
+
+    private var woodenRole: WoodButtonRole? {
+        guard grade == .chrome || (grade == .mini && ["trash", "trash.fill"].contains(symbol)) else { return nil }
+        if sticker == "FoxSettingsHelp" { return .help }
+        guard sticker == nil, glyphImage == nil else { return nil }
+        switch symbol {
+        case "xmark": return .close
+        case "chevron.left", "arrow.left": return .back
+        case "gear", "gearshape", "gearshape.fill": return .settings
+        case "questionmark": return .help
+        case "trash", "trash.fill": return .delete
+        default: return nil
         }
     }
 
@@ -201,5 +215,39 @@ struct OutlinedGlyph: View {
         // One shadow for the whole composited glyph, not one per copy.
         .compositingGroup()
         .shadow(color: .black.opacity(shadow), radius: max(0.5, outlineWidth * 0.9), y: 1)
+    }
+}
+
+/// Each asset is the complete approved button, including its carved icon.
+enum WoodButtonRole: String {
+    case close = "Close", back = "Back", settings = "Settings"
+    case help = "Help", delete = "Delete", add = "Add", routine = "Routine"
+
+    var accessibilityTitle: String {
+        switch self {
+        case .close: "Close"
+        case .back: "Back"
+        case .settings: "Settings"
+        case .help: "Help"
+        case .delete: "Delete"
+        case .add: "Create your own habit"
+        case .routine: "Create a routine"
+        }
+    }
+}
+
+struct WoodButtonArtwork: View {
+    let role: WoodButtonRole
+    var diameter: CGFloat = 40
+
+    var body: some View {
+        Image("AuraWood" + role.rawValue)
+            .resizable()
+            .interpolation(.high)
+            .scaledToFit()
+            // The transparent canvas leaves breathing room for the drop edge.
+            .frame(width: diameter * 1.10, height: diameter * 1.10)
+            .frame(width: diameter, height: diameter)
+            .accessibilityLabel(role.accessibilityTitle)
     }
 }

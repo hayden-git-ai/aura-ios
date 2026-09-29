@@ -15,6 +15,10 @@ load every markdown file by default.
   `docs/SAFE_AGENT_SKILLS.md` and `docs/SKILL_REGISTRY.md`.
 - End-of-task handoff: use `docs/AGENT_HANDOFF_TEMPLATE.md`.
 - After a mistake or slow task: update `docs/AGENT_REVIEW_LOG.md`.
+- Coordinated physical-device acceptance: read `docs/DEVICE_EXECUTION_PLAN.md`
+  and the workspace's `../device-testing-checklist.md`; preserve recorded passes.
+- Cofounder review fixes: use `docs/DEVICE_REVIEW_BACKLOG.md` for item IDs,
+  agent ownership and the current implementation/upload hold.
 
 ## Non-Negotiables
 
@@ -49,6 +53,35 @@ Touching files outside the stated scope requires a brief reason in the handoff.
 - Use small subagents only for independent side work.
 - Use cheaper/faster models for small edits and checklists. Use stronger models for orchestration, launch-critical diagnosis, or cross-system decisions.
 - Keep final handoffs compact.
+
+## Execution Ownership
+
+- Astra low coordinates; Luna low handles bounded checks and mechanical work,
+  Luna medium handles focused implementation. Escalate a concrete unresolved
+  diagnosis to Astra; do not increase every worker's effort.
+- Use at most three workers plus the coordinator. Give each a short task packet:
+  outcome, owned files/resources, source/build ID, evidence, acceptance, stop rule.
+- Reuse existing lane ownership across tasks. One writer per file, one operator
+  per phone/browser session, one build owner. No nested delegation by default.
+- Agents perform every supported physical-device interaction and verification.
+  Hayden handles only specific inaccessible controls or physical actions. A
+  simulator pass never completes a physical-device checkbox.
+- During an unattended run, queue human-only or permission-blocked cases for
+  Hayden's return and continue independent work; never label skipped cases passed.
+- Preserve dirty changes. Bind evidence to installed build and tested source;
+  pending local fixes are not present in an older TestFlight installation.
+- The coordinator alone integrates status and shared-doc edits. Workers return
+  changed files, evidence, blockers and affected retests, normally under 200 words.
+
+## Bounded Improvement
+
+- Propose at most one evidence-backed process lesson per completed task; skip
+  routine success. Coordinator deduplicates and replaces an obsolete rule first.
+- Keep this boot file at most 120 lines, the playbook under 250, and current
+  review-log lessons at most 12 bullets. Archive history outside boot reads.
+- Track elapsed time, repeated checks and correction loops in existing task
+  evidence; record token usage only when available. Remove experiments that add
+  overhead without improving the next comparable task. No recursive doc audits.
 
 ## Definition Of Done
 

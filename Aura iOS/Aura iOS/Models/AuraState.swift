@@ -71,9 +71,8 @@ struct ActiveFocusSession: Hashable, Codable {
     /// The length it was set to, kept so a finished session can report what it
     /// was worth without re-reading the config.
     let lengthMinutes: Int
-    /// Coins per hour, captured at commit. Held here so the store can settle up
-    /// on its own — a session that ends while the app is closed still has to
-    /// pay out, and the setup screen that knew the rate is long gone.
+    /// Legacy hourly field retained for persistence compatibility. Deep Focus
+    /// awards one coin per focused minute, so this no longer controls payout.
     let earnRate: Double
 
     /// What this session has earned, given where the clock is.
@@ -82,7 +81,7 @@ struct ActiveFocusSession: Hashable, Codable {
     /// minutes actually sat through.
     func earnedMinutes(at now: Date) -> Int {
         let seconds = isOpenEnded ? elapsedSeconds(at: now) : lengthMinutes * 60
-        return Int((Double(seconds) / 3600 * earnRate).rounded())
+        return max(0, seconds) / 60
     }
 
     var isOpenEnded: Bool { endsAt == nil }

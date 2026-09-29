@@ -21,6 +21,153 @@ enum HabitLaunch: Identifiable {
     }
 }
 
+/// Connected game-menu tabs for Healthy Habits. The selected face uses the
+/// exact card artwork so the mint gradient and stars stay as clean as the
+/// cards below it rather than being approximated in code.
+private struct HealthyHabitGameTabs: View {
+    let titles: [String]
+    @Binding var selection: Int
+    var selectedBackgroundAsset = "HealthyHabitCardBackground"
+    var inactiveColor = LightSheet.healthyHabitsReward
+
+    private let height: CGFloat = 58
+
+    var body: some View {
+        GeometryReader { geometry in
+            let selectedShape = HealthyHabitSelectedTabShape(isLeading: selection == 0)
+
+            ZStack {
+                HealthyHabitTabBaseShape()
+                    .fill(inactiveColor)
+
+                Image(selectedBackgroundAsset)
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFill()
+                    .frame(width: geometry.size.width, height: height)
+                    .clipShape(selectedShape)
+
+                selectedShape
+                    .stroke(.white, lineWidth: 3)
+
+                HStack(spacing: 0) {
+                    ForEach(titles.indices, id: \.self) { index in
+                        let selected = selection == index
+                        Button {
+                            guard selection != index else { return }
+                            Haptics.selection()
+                            selection = index
+                        } label: {
+                            HealthyHabitTabLabel(
+                                text: titles[index],
+                                selected: selected
+                            )
+                            .accessibilityHidden(true)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(titles[index])
+                        .accessibilityValue(selected ? "Selected" : "")
+                    }
+                }
+                .padding(.horizontal, Theme.Spacing.xs)
+            }
+            .overlay {
+                HealthyHabitTabBaseShape()
+                    .stroke(.white, lineWidth: 3)
+            }
+            .shadow(color: .black.opacity(0.22), radius: 5, y: 4)
+        }
+        .frame(height: height)
+    }
+}
+
+private struct HealthyHabitTabLabel: View {
+    let text: String
+    let selected: Bool
+
+    private let outlineWidth: CGFloat = 1.15
+    private let directions: [(CGFloat, CGFloat)] = [
+        (-1, -1), (0, -1), (1, -1),
+        (-1, 0),            (1, 0),
+        (-1, 1),  (0, 1),  (1, 1)
+    ]
+
+    var body: some View {
+        ZStack {
+            if selected {
+                ForEach(directions.indices, id: \.self) { index in
+                    label
+                        .foregroundStyle(.white)
+                        .offset(x: directions[index].0 * outlineWidth,
+                                y: directions[index].1 * outlineWidth)
+                }
+            }
+
+            label
+                .foregroundStyle(selected ? .black : .white)
+        }
+        .shadow(color: .black.opacity(selected ? 0.14 : 0.20), radius: 1, y: 1)
+    }
+
+    private var label: some View {
+        Text(text)
+            .auraFont(.display, 18, .bold)
+            .lineLimit(1)
+            .minimumScaleFactor(0.82)
+    }
+}
+
+private struct HealthyHabitTabBaseShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        RoundedRectangle(cornerRadius: 14, style: .continuous).path(in: rect)
+    }
+}
+
+private struct HealthyHabitSelectedTabShape: Shape {
+    let isLeading: Bool
+
+    func path(in rect: CGRect) -> Path {
+        let inset: CGFloat = 7
+        let cut: CGFloat = 10
+        let seam = rect.midX
+        var path = Path()
+
+        if isLeading {
+            path.move(to: CGPoint(x: inset + cut, y: inset))
+            path.addLine(to: CGPoint(x: seam - 10, y: inset))
+            path.addLine(to: CGPoint(x: seam + 10, y: rect.maxY - inset))
+            path.addLine(to: CGPoint(x: inset + cut, y: rect.maxY - inset))
+            path.addQuadCurve(
+                to: CGPoint(x: inset, y: rect.maxY - inset - cut),
+                control: CGPoint(x: inset, y: rect.maxY - inset)
+            )
+            path.addLine(to: CGPoint(x: inset, y: inset + cut))
+            path.addQuadCurve(
+                to: CGPoint(x: inset + cut, y: inset),
+                control: CGPoint(x: inset, y: inset)
+            )
+        } else {
+            path.move(to: CGPoint(x: seam - 10, y: inset))
+            path.addLine(to: CGPoint(x: rect.maxX - inset - cut, y: inset))
+            path.addQuadCurve(
+                to: CGPoint(x: rect.maxX - inset, y: inset + cut),
+                control: CGPoint(x: rect.maxX - inset, y: inset)
+            )
+            path.addLine(to: CGPoint(x: rect.maxX - inset, y: rect.maxY - inset - cut))
+            path.addQuadCurve(
+                to: CGPoint(x: rect.maxX - inset - cut, y: rect.maxY - inset),
+                control: CGPoint(x: rect.maxX - inset, y: rect.maxY - inset)
+            )
+            path.addLine(to: CGPoint(x: seam + 10, y: rect.maxY - inset))
+        }
+
+        path.closeSubpath()
+        return path
+    }
+}
+
 /// The habit list + builder sheet for a single earn method — laid out to match
 /// the Apple Health sheet (grabber, centered-title header, then a divided list
 /// of icon rows) so the earn flows read as one consistent family. The method is
@@ -50,19 +197,27 @@ struct AddHabitFlowRoot: View {
     @State private var pinnedHabits: Set<UUID> = []
     @State private var pinnedExercises: Set<String> = []
     @State private var photoTab = 0
-    @State private var filter: HabitFilter = .all
-    /// Camera Reps difficulty tab. nil == "All".
-    @State private var exerciseFilter: ExerciseDifficulty? = nil
-    /// Lets the selected capsule travel between pills rather than blink over.
-    @Namespace private var filterPill
+    /// Camera Reps uses the same two-face selector as Healthy Habits.
+    /// Easy stays approachable; Medium and Hard are grouped under Hard.
+    @State private var exerciseTab = 0
+
+    private enum HealthyHeader {
+        static let ribbonVisibleWidthRatio: CGFloat = 2062.0 / 2172.0
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             habitList(startCategory)
         }
-        .background(MethodScreenBackground(
-            height: MethodScreenBackground.heroCentred(stickerHeight: startCategory.heroHeight),
-            color: startCategory.accent))
+        .background {
+            if usesIllustratedEarnHeader(startCategory) {
+                EarnMethodIllustratedBackground()
+            } else {
+                MethodScreenBackground(
+                    height: MethodScreenBackground.heroCentred(stickerHeight: EarnFoxPlaybackView.defaultSize),
+                    color: startCategory.accent)
+            }
+        }
         .preferredColorScheme(.light)
         .onAppear {
             pinnedHabits = store.favoriteHabitIds
@@ -74,6 +229,11 @@ struct AddHabitFlowRoot: View {
                 method: target.category,
                 onSave: { habit in
                     store.upsertHabit(habit)
+                    if target.existing == nil && target.category == .photoTask {
+                        if !store.isFavorite(habit) { store.toggleFavorite(habit) }
+                        pinnedHabits = store.favoriteHabitIds
+                        photoTab = habit.requiresFocusSession ? 0 : 1
+                    }
                     builderTarget = nil
                 },
                 onClose: { builderTarget = nil }
@@ -90,32 +250,71 @@ struct AddHabitFlowRoot: View {
 
     private func methodSubtitle(_ category: HabitCategory) -> String {
         switch category {
-        case .photoTask: return "Snap the proof, pocket the coins!"
+        case .photoTask: return "Snap a pic, earn coins!"
         case .exercise: return "Every rep you knock out earns you coins!"
         case .focus: return "Apps stay locked till the timer's up!"
         case .healthSync: return "Your steps are secretly stacking coins!"
         }
     }
 
+    private func usesIllustratedEarnHeader(_ category: HabitCategory) -> Bool {
+        category == .photoTask || category == .exercise
+    }
+
+    private func rewardRibbonAsset(_ category: HabitCategory) -> String {
+        category == .exercise
+            ? "DailyExerciseRewardRibbon"
+            : "HealthyHabitsRewardRibbon"
+    }
+
+    private func rewardRibbonLabel(_ category: HabitCategory) -> String {
+        category == .exercise
+            ? "Do reps, earn coins!"
+            : methodSubtitle(category)
+    }
+
     @ViewBuilder
     private func habitList(_ category: HabitCategory) -> some View {
+        VStack(spacing: 0) {
+        if usesIllustratedEarnHeader(category) {
+            EarnMethodIllustratedHeader {
+                GeometryReader { geometry in
+                    let artworkWidth = (geometry.size.width - Theme.Spacing.xl * 2)
+                        / HealthyHeader.ribbonVisibleWidthRatio
+                    Image(rewardRibbonAsset(category))
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: artworkWidth, height: artworkWidth / 3)
+                        .position(x: geometry.size.width / 2,
+                                  y: geometry.size.height / 2 + Theme.Spacing.xs)
+                        .shadow(color: .black.opacity(0.16), radius: 2, y: 2)
+                }
+                .accessibilityLabel(rewardRibbonLabel(category))
+            }
+            if category == .photoTask {
+                photoToggle
+                    .padding(.horizontal, Theme.Spacing.xl)
+                    .padding(.top, Theme.Spacing.xxl)
+                    .padding(.bottom, Theme.Spacing.s)
+            } else if category == .exercise {
+                exerciseToggle
+                    .padding(.horizontal, Theme.Spacing.xl)
+                    .padding(.top, Theme.Spacing.xxl)
+                    .padding(.bottom, Theme.Spacing.s)
+            }
+        }
         ScrollViewReader { proxy in
         ScrollView {
             VStack(alignment: .leading, spacing: Theme.Spacing.l) {
-                FocusHero(
-                    sticker: methodSticker(category),
-                    title: methodTitle(category),
-                    subtitle: methodSubtitle(category),
-                    stickerHeight: category.heroHeight,
-                    titleColor: .white,
-                    subtitleColor: LightSheet.onColour,
-                    titleGap: 0
-                )
-                .frame(maxWidth: .infinity)
-                .id("top")
+                if !usesIllustratedEarnHeader(category) {
+                    EarnMethodHero(title: methodTitle(category), subtitle: methodSubtitle(category))
+                        .frame(maxWidth: .infinity)
+                        .id("top")
+                }
 
                 if category == .photoTask {
                     photoTabbed(category)
+                        .id("top")
                 } else if category == .exercise {
                     exerciseList
                 } else {
@@ -132,13 +331,9 @@ struct AddHabitFlowRoot: View {
         // The two lists are different lengths, so switching mid-scroll would
         // reflow the content under the slide. Start each at the top instead.
         .onChange(of: photoTab) { proxy.scrollTo("top", anchor: .top) }
-        // A short filter after scrolling down would otherwise leave the content
-        // jumping out from under the thumb.
-        .onChange(of: filter) {
+        .onChange(of: exerciseTab) {
             withAnimation(.easeInOut(duration: 0.28)) { proxy.scrollTo("top", anchor: .top) }
         }
-        .onChange(of: exerciseFilter) {
-            withAnimation(.easeInOut(duration: 0.28)) { proxy.scrollTo("top", anchor: .top) }
         }
         }
         // Close X floats over the scrolling hero. The rate-editor button that
@@ -147,18 +342,24 @@ struct AddHabitFlowRoot: View {
         // X left, `?` right — the same pairing on every quest screen, so the
         // way out is always in one corner and the explainer in the other.
         .overlay(alignment: .topLeading) {
-            CircleIconButton(symbol: "xmark", glyphColor: LightSheet.subtitleDark, bounces: false) { dismiss() }
+            CircleIconButton(symbol: "xmark",
+                             fill: usesIllustratedEarnHeader(category) ? LightSheet.chromeOnBlue : LightSheet.chromeOnLight,
+                             glyphColor: usesIllustratedEarnHeader(category) ? .white : LightSheet.subtitleDark,
+                             bounces: false) {
+                dismiss()
+            }
                 .padding(.leading, Theme.Spacing.xl)
                 .padding(.top, Theme.Spacing.l)
         }
         .overlay(alignment: .topTrailing) {
-            ExplainerButton(explainer: QuestExplainer.forCategory(category))
+            ExplainerButton(explainer: QuestExplainer.forCategory(category),
+                            onBlue: usesIllustratedEarnHeader(category))
                 .padding(.trailing, Theme.Spacing.xl)
                 .padding(.top, Theme.Spacing.l)
         }
         .overlay(alignment: .bottomTrailing) {
             if category == .photoTask {
-                CreateHabitButton(color: category.accent) { openBuilder(category) }
+                CreateHabitButton(color: LightSheet.healthyHabitsMint) { openBuilder(category) }
                     .padding(.trailing, Theme.Spacing.xl)
                     .padding(.bottom, Theme.Spacing.xl)
             }
@@ -179,67 +380,42 @@ struct AddHabitFlowRoot: View {
 
     // MARK: - Photo Proof (Focus / Quick tabs)
 
+    private var photoToggle: some View {
+        HealthyHabitGameTabs(
+            titles: ["Focus Habits", "Quick Habits"],
+            selection: Binding(
+                get: { photoTab },
+                set: { new in
+                    withAnimation(.snappy(duration: 0.24)) { photoTab = new }
+                }
+            )
+        )
+    }
+
     @ViewBuilder
     private func photoTabbed(_ category: HabitCategory) -> some View {
-        // Stats' curve, not the pill's default snap — the two mode switches in
-        // the app should feel identical.
-        LightSegmentedPill(
-            titles: ["Focus Habits", "Quick Habits"],
-            selection: Binding(get: { photoTab },
-                               set: { new in
-                                   withAnimation(.easeInOut(duration: 0.32)) {
-                                       photoTab = new
-                                       filter = .all
-                                   }
-                               }),
-            onBlue: true,
-            onColor: startCategory.accent
-        )
-            .padding(.top, Theme.Spacing.xs)
-
-        filterStrip
-            .padding(.top, Theme.Spacing.xs)
-
         let habits = pinnedFirst(visibleHabits)
         VStack(spacing: Theme.Spacing.m) {
-            ForEach(habits) { habit in
-                habitRow(habit)
-                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
+            LazyVGrid(
+                columns: [GridItem(.flexible())],
+                spacing: 12
+            ) {
+                ForEach(habits) { habit in
+                    habitCard(habit)
+                        .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                }
             }
 
-            // The one filter that can legitimately be empty.
+            // Empty state remains available if a tab has no habits.
             if habits.isEmpty {
                 VStack(spacing: Theme.Spacing.m) {
-                    // Its own art now, not the method's mascot standing in. The
-                    // same illustration whichever method you're on, because
-                    // "you haven't made one yet" is the same fact in all four.
-                    //
-                    // No contour, but it keeps the shadow. The white outline
-                    // is what makes something read as a sticker CUT OUT and
-                    // laid on a surface; the shadow is just what lifts it off
-                    // one. An illustration wants the second without the first.
-                    //
-                    // Applied here rather than baked, because at 150pt the
-                    // sticker pipeline's proportions would be a much heavier
-                    // shadow than the same treatment gives a 34pt icon.
-                    Image("FoxEmptyState")
-                        .resizable()
-                        .interpolation(.high)
-                        .scaledToFit()
-                        // 141, not 150, and the number comes from the art.
-                        // The drawing is 425px tall; at 3x that is 141pt of
-                        // screen. Asking for 150 stretched it, and no amount of
-                        // interpolation invents detail that was never exported.
-                        .frame(height: 141)
-                        .foxShadow()
-
                     VStack(spacing: Theme.Spacing.xs) {
                         Text("No custom habits yet")
                             .auraFont(.display, SheetType.sectionHeader, .bold)
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.black)
                         Text("Press \"+\" to create your own")
                             .auraFont(.body, SheetType.subtitle, .regular)
-                            .foregroundStyle(LightSheet.onColour)
+                            .foregroundStyle(.black)
                     }
                     .multilineTextAlignment(.center)
                 }
@@ -261,63 +437,13 @@ struct AddHabitFlowRoot: View {
 
     /// Hearted first, everything else in its original order.
     private func pinnedFirst(_ habits: [Habit]) -> [Habit] {
-        habits.filter { pinnedHabits.contains($0.id) } + habits.filter { !pinnedHabits.contains($0.id) }
+        let favorites = habits.filter { pinnedHabits.contains($0.id) }
+        return favorites.filter { $0.isCustom } + favorites.filter { !$0.isCustom }
+            + habits.filter { !pinnedHabits.contains($0.id) }
     }
 
-    /// The current tab's habits, narrowed by the filter pill.
     private var visibleHabits: [Habit] {
-        let base = photoTab == 0 ? store.focusHabits : store.quickHabits
-        return base.filter { filter.matches($0) }
-    }
-
-    /// Only the pills that would actually return something in this tab — an
-    /// empty category is a dead end, not a filter.
-    private var availableFilters: [HabitFilter] {
-        let base = photoTab == 0 ? store.focusHabits : store.quickHabits
-        // "Created by me" is always second, whether or not anything is in it —
-        // it's how someone learns they can build their own.
-        var options: [HabitFilter] = [.all, .custom]
-        options += HabitTag.allCases
-            .filter { tag in base.contains { $0.tag == tag } }
-            .map { HabitFilter.tag($0) }
-        return options
-    }
-
-    /// Horizontal pills over the list, in the same translucent material the FAB
-    /// sits on. Bleeds past the content's margins so it scrolls edge to edge.
-    private var filterStrip: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: Theme.Spacing.s) {
-                ForEach(availableFilters, id: \.self) { option in
-                    let selected = filter == option
-                    Text(option.label)
-                        .auraFont(.body, RowType.value, .semibold)
-                        .foregroundStyle(selected ? startCategory.accent : .white)
-                        .padding(.horizontal, Theme.Spacing.l)
-                        .frame(height: 32)
-                        .background {
-                            // The unselected track is always there; only the
-                            // white capsule moves, and it moves rather than
-                            // fading out and back in somewhere else.
-                            Capsule().fill(.black.opacity(0.12))
-                            if selected {
-                                Capsule()
-                                    .fill(.white)
-                                    .matchedGeometryEffect(id: "filterPill", in: filterPill)
-                            }
-                        }
-                        .contentShape(Capsule())
-                        .onTapGesture {
-                            guard filter != option else { return }
-                            Haptics.selection()
-                            withAnimation(.snappy(duration: 0.28)) { filter = option }
-                        }
-                }
-            }
-            .padding(.horizontal, Theme.Spacing.xl)
-        }
-        .scrollClipDisabled()
-        .padding(.horizontal, -Theme.Spacing.xl)
+        photoTab == 0 ? store.focusHabits : store.quickHabits
     }
 
     private func habitRow(_ habit: Habit) -> some View {
@@ -330,6 +456,19 @@ struct AddHabitFlowRoot: View {
             // Straight to the habit's own screen rather than the camera: it
             // holds the reward settings that used to live in Edit Rewards, and
             // its CTA is what actually starts the run.
+            onTap: { detail = habit },
+            onFavorite: { store.toggleFavorite(habit) },
+            icon: { habitGlyph(habit) }
+        )
+    }
+
+    private func habitCard(_ habit: Habit) -> some View {
+        HabitPickerCard(
+            title: habit.name,
+            rate: habit.requiresFocusSession
+                ? "\(Int(habit.rewardRate))/hr"
+                : "\(habit.rewardMinutes)",
+            isFavorite: store.isFavorite(habit),
             onTap: { detail = habit },
             onFavorite: { store.toggleFavorite(habit) },
             icon: { habitGlyph(habit) }
@@ -354,6 +493,20 @@ struct AddHabitFlowRoot: View {
 
     // MARK: - Camera Reps
 
+    private var exerciseToggle: some View {
+        HealthyHabitGameTabs(
+            titles: ["Easy", "Hard"],
+            selection: Binding(
+                get: { exerciseTab },
+                set: { new in
+                    withAnimation(.snappy(duration: 0.24)) { exerciseTab = new }
+                }
+            ),
+            selectedBackgroundAsset: "DailyExerciseCardBackground",
+            inactiveColor: LightSheet.Achievement.reps.ink
+        )
+    }
+
     private var exerciseList: some View {
         // Easy at the top, hard at the bottom by default; favourites still float
         // above the rest, ordered easy→hard among themselves. Swift's sort is
@@ -361,61 +514,31 @@ struct AddHabitFlowRoot: View {
         let byDifficulty = Exercise.all.sorted { $0.difficulty.rank < $1.difficulty.rank }
         let ordered = byDifficulty.filter { pinnedExercises.contains($0.id) }
             + byDifficulty.filter { !pinnedExercises.contains($0.id) }
-        let shown = ordered.filter { exerciseFilter == nil || $0.difficulty == exerciseFilter }
-        return VStack(alignment: .leading, spacing: Theme.Spacing.m) {
-            exerciseFilterStrip
-                .padding(.top, Theme.Spacing.xs)
-
-            VStack(spacing: Theme.Spacing.m) {
-                ForEach(shown) { exercise in
-                    exerciseRow(exercise)
-                        .transition(.opacity.combined(with: .scale(scale: 0.96)))
-                }
+        let shown = ordered.filter {
+            exerciseTab == 0 ? $0.difficulty == .easy : $0.difficulty != .easy
+        }
+        return VStack(spacing: Theme.Spacing.m) {
+            ForEach(shown) { exercise in
+                exerciseRow(exercise)
+                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
             }
         }
-    }
-
-    /// Difficulty tabs over the exercise list — All / Easy / Medium / Hard, the
-    /// same translucent pill strip Photo Proof uses for its categories.
-    private var exerciseFilterStrip: some View {
-        let options: [ExerciseDifficulty?] = [nil] + ExerciseDifficulty.allCases
-        return ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: Theme.Spacing.s) {
-                ForEach(options, id: \.self) { option in
-                    let selected = exerciseFilter == option
-                    Text(option?.label ?? "All")
-                        .auraFont(.body, RowType.value, .semibold)
-                        .foregroundStyle(selected ? startCategory.accent : .white)
-                        .padding(.horizontal, Theme.Spacing.l)
-                        .frame(height: 32)
-                        .background {
-                            Capsule().fill(.black.opacity(0.12))
-                            if selected {
-                                Capsule()
-                                    .fill(.white)
-                                    .matchedGeometryEffect(id: "exerciseFilterPill", in: filterPill)
-                            }
-                        }
-                        .contentShape(Capsule())
-                        .onTapGesture {
-                            guard exerciseFilter != option else { return }
-                            Haptics.selection()
-                            withAnimation(.snappy(duration: 0.28)) { exerciseFilter = option }
-                        }
-                }
-            }
-            .padding(.horizontal, Theme.Spacing.xl)
-        }
-        .scrollClipDisabled()
-        .padding(.horizontal, -Theme.Spacing.xl)
+        .id(exerciseTab)
+        .transition(
+            .asymmetric(
+                insertion: .move(edge: exerciseTab == 0 ? .leading : .trailing).combined(with: .opacity),
+                removal: .move(edge: exerciseTab == 0 ? .trailing : .leading).combined(with: .opacity)
+            )
+        )
     }
 
     private func exerciseRow(_ exercise: Exercise) -> some View {
-        HabitPickerRow(
+        HabitPickerCard(
             title: exercise.name,
             rate: "\(String(format: "%g", store.rate(for: exercise)))/\(exercise.unitNoun)",
             isFavorite: store.isFavorite(exercise),
-            iconWidth: 66,
+            backgroundAsset: "DailyExerciseCardBackground",
+            rewardColor: LightSheet.Achievement.reps.ink,
             onTap: { exerciseDetail = exercise },
             onFavorite: { store.toggleFavorite(exercise) },
             icon: {
@@ -455,4 +578,3 @@ struct AddHabitFlowRoot: View {
         }
     }
 }
-

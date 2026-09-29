@@ -7,11 +7,8 @@ import SwiftUI
 
 /// "How this works", as numbered steps.
 ///
-/// One sheet for the coins explainer and all four quests. The only things that
-/// change between them are the words, the sticker and the accent on the
-/// numerals — everything else is the same shape, so it's a component rather
-/// than five files that would drift apart the first time one of them was
-/// tweaked.
+/// One sheet for the coins explainer and all four quests. The words and accent
+/// change per method, while the steps share one layout.
 struct StepsExplainerSheet: View {
     struct Step {
         let title: String
@@ -19,8 +16,10 @@ struct StepsExplainerSheet: View {
     }
 
     let title: String
-    /// Asset-catalog name for the hero above the steps.
-    let hero: String
+    let subtitle: String
+    /// Blocking retains its established explainer art; Earn and camera sheets
+    /// intentionally leave this nil.
+    var hero: String? = nil
     let steps: [Step]
     /// The numerals' colour. Each quest brings its own so the sheet reads as
     /// part of the screen it opened from.
@@ -46,11 +45,7 @@ struct StepsExplainerSheet: View {
     /// between single-line rows, which is only ~40% of a block's own height and
     /// reads as cramped.
     private static let betweenSteps = Theme.Spacing.xxl
-    /// Height, not a square. The illustration is taller than it is wide, and a
-    /// square frame fits it by height anyway while leaving the width lying about
-    /// what the art is. One value across all eight "how this works" screens.
     private static let heroHeight: CGFloat = 140
-
     var body: some View {
         ZStack(alignment: .top) {
             LightSheet.bg.ignoresSafeArea()
@@ -58,20 +53,34 @@ struct StepsExplainerSheet: View {
             VStack(spacing: 0) {
                 LightDragCapsule()
 
-                // Same size, weight and top inset `LightSheetTitle` uses, so
-                // this lands where every other sheet's title does. Set inline
-                // because that component requires a subtitle, and the steps say
-                // anything a subtitle would.
+                if let hero {
+                    Image(hero)
+                        .resizable()
+                        .interpolation(.high)
+                        .scaledToFit()
+                        .frame(height: Self.heroHeight)
+                        .foxShadow()
+                        .padding(.top, Theme.Spacing.l)
+                }
+
                 Text(title)
                     .auraFont(.display, SheetType.title, .bold)
                     .foregroundStyle(SheetType.titleColor)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity)
-                    .padding(.top, Theme.Spacing.l + Theme.Spacing.m)
+                    .padding(.top, hero == nil ? Theme.Spacing.l : Theme.Spacing.l + Theme.Spacing.m)
                     .padding(.horizontal, Theme.Spacing.xl)
 
-                // Hero, steps and footnote scroll; the capsule above and the
-                // buttons below do not.
+                Text(subtitle)
+                    .auraFont(.body, SheetType.subtitle, .regular)
+                    .foregroundStyle(SheetType.subtitleColor)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, Theme.Spacing.xxl)
+                    .padding(.top, Theme.Spacing.xs)
+
+                // Steps and footnote scroll; the capsule and header art above
+                // and the buttons below do not.
                 //
                 // This used to be one VStack inside a fixed 730pt sheet, which
                 // meant the tallest explainer overflowed and SwiftUI pushed the
@@ -81,15 +90,6 @@ struct StepsExplainerSheet: View {
                 // lost its capsule. A scroll view makes the length irrelevant.
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 0) {
-                    Image(hero)
-                        .resizable()
-                        .interpolation(.high)
-                        .scaledToFit()
-                        .frame(height: Self.heroHeight)
-                        // The Home fox's contact oval, sized to the hero's height.
-                        .foxShadow()
-                        .padding(.top, Theme.Spacing.xl)
-
                     VStack(alignment: .leading, spacing: Self.betweenSteps) {
                         ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
                             row(number: index + 1, step: step)
