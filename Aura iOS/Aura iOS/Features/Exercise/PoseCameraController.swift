@@ -5,7 +5,7 @@
 
 import SwiftUI
 import Combine
-import AVFoundation
+@preconcurrency import AVFoundation
 import Vision
 
 /// Runs the front camera, feeds each frame to Vision's body-pose detector, and
@@ -67,6 +67,7 @@ final class PoseCameraController: NSObject, ObservableObject {
         super.init()
         previewLayer.session = session
         previewLayer.videoGravity = .resizeAspectFill
+        videoOutput.setSampleBufferDelegate(self, queue: sampleQueue)
     }
 
     @MainActor
@@ -127,7 +128,6 @@ final class PoseCameraController: NSObject, ObservableObject {
                 }
                 self.session.addInput(input)
 
-                self.videoOutput.setSampleBufferDelegate(self, queue: self.sampleQueue)
                 self.videoOutput.alwaysDiscardsLateVideoFrames = true
                 if self.session.canAddOutput(self.videoOutput) {
                     self.session.addOutput(self.videoOutput)
@@ -136,12 +136,16 @@ final class PoseCameraController: NSObject, ObservableObject {
                 // Mirror only the preview so the skeleton follows the visible
                 // front-camera image without mirroring the buffer twice.
                 if let connection = self.videoOutput.connection(with: .video) {
-                    connection.videoOrientation = .portrait
+                    if connection.isVideoRotationAngleSupported(90) {
+                        connection.videoRotationAngle = 90
+                    }
                     connection.automaticallyAdjustsVideoMirroring = false
                     connection.isVideoMirrored = false
                 }
                 if let connection = self.previewLayer.connection {
-                    connection.videoOrientation = .portrait
+                    if connection.isVideoRotationAngleSupported(90) {
+                        connection.videoRotationAngle = 90
+                    }
                     connection.automaticallyAdjustsVideoMirroring = false
                     connection.isVideoMirrored = true
                 }

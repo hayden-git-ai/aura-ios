@@ -89,27 +89,6 @@ struct EarnMethodIllustratedHeader<Caption: View>: View {
     }
 }
 
-/// Text caption for methods that do not yet have a rendered ribbon asset.
-struct EarnMethodIllustratedTitle: View {
-    let title: String
-    let subtitle: String
-
-    var body: some View {
-        VStack(spacing: Theme.Spacing.xs) {
-            EarnOutlinedTitle(
-                text: title,
-                font: Typography.displayUIFont(size: SheetType.title, weight: .bold)
-            )
-            Text(subtitle)
-                .auraFont(.body, SheetType.subtitle, .bold)
-                .foregroundStyle(LightSheet.title)
-                .multilineTextAlignment(.center)
-                .shadow(color: .white, radius: 1)
-        }
-        .padding(.horizontal, Theme.Spacing.xl)
-    }
-}
-
 /// The approved illustrated gold ribbon used by every earn-method header.
 struct EarnMethodRewardRibbon: View {
     private static let visibleWidthRatio: CGFloat = 2062.0 / 2172.0

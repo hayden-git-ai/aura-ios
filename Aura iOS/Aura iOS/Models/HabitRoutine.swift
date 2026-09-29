@@ -21,8 +21,8 @@ struct HabitRoutine: Codable, Equatable, Identifiable {
     /// Calendar weekday numbers, 1 = Sunday.
     var weekdays: Set<Int>
 
-    var hour: Int { minuteOfDay / 60 }
-    var minute: Int { minuteOfDay % 60 }
+    nonisolated var hour: Int { minuteOfDay / 60 }
+    nonisolated var minute: Int { minuteOfDay % 60 }
 
     /// One request per weekday. `UNCalendarNotificationTrigger` takes a single
     /// weekday, so a routine on three days is three requests that have to be

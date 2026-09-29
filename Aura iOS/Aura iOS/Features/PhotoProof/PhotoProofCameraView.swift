@@ -10,9 +10,10 @@ import AVFoundation
 /// place. A preference rather than a shared constant because the frame's
 /// position is decided by the layout, not by us.
 private struct ViewfinderFrameKey: PreferenceKey {
-    static let defaultValue: Anchor<CGRect>? = nil
-    static func reduce(value: inout Anchor<CGRect>?, nextValue: () -> Anchor<CGRect>?) {
-        value = nextValue() ?? value
+    static let defaultValue: CGRect = .zero
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        let next = nextValue()
+        if next != .zero { value = next }
     }
 }
 
@@ -46,6 +47,7 @@ struct PhotoProofCameraView: View {
     @State private var showHelp = false
     @State private var showAISharingConsent = false
     @State private var waitingForPrivacyReturn = false
+    @State private var viewfinderFrame: CGRect = .zero
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -94,11 +96,16 @@ struct PhotoProofCameraView: View {
             } else {
                 cameraLayer
                 CameraScrim()
+                if viewfinderFrame != .zero {
+                    scrim(around: viewfinderFrame)
+                        .ignoresSafeArea()
+                }
                 liveOverlay
             }
         }
         .background(.black)
         .statusBarHidden()
+        .onPreferenceChange(ViewfinderFrameKey.self) { viewfinderFrame = $0 }
         .onAppear {
             #if DEBUG
             // The Simulator has no camera, so every state past the shutter is
@@ -240,7 +247,6 @@ struct PhotoProofCameraView: View {
         }
     }
 
-
     // MARK: - Overlay
 
     private var liveOverlay: some View {
@@ -258,13 +264,6 @@ struct PhotoProofCameraView: View {
                 bottomControls.padding(.bottom, Theme.Spacing.xl)
             }
         }
-        .backgroundPreferenceValue(ViewfinderFrameKey.self) { frame in
-            GeometryReader { proxy in
-                if let frame {
-                    scrim(around: proxy[frame])
-                }
-            }
-        }
     }
 
     private var brackets: some View {
@@ -272,7 +271,12 @@ struct PhotoProofCameraView: View {
                            cornerRadius: ViewfinderFrame.radius)
             .stroke(.white.opacity(0.92), style: StrokeStyle(lineWidth: 5, lineCap: .round))
             .frame(width: ViewfinderFrame.size.width, height: ViewfinderFrame.size.height)
-            .anchorPreference(key: ViewfinderFrameKey.self, value: .bounds) { $0 }
+            .background {
+                GeometryReader { proxy in
+                    Color.clear.preference(key: ViewfinderFrameKey.self,
+                                           value: proxy.frame(in: .global))
+                }
+            }
             .allowsHitTesting(false)
     }
 

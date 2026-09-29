@@ -12,6 +12,7 @@ import SwiftUI
 
 @main
 struct AuraStatsReportExtension: DeviceActivityReportExtension {
+    @MainActor
     var body: some DeviceActivityReportScene {
         ScreenTimeWeekScene()
         HoursSavedScene()

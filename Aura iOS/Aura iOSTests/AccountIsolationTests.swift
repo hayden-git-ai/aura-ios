@@ -26,6 +26,7 @@ final class AccountIsolationTests: XCTestCase {
             self.currentUserID = currentUserID
         }
 
+        @MainActor
         func store() -> HabitStore {
             HabitStore(
                 accountDependencies: .init(

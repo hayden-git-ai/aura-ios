@@ -52,11 +52,11 @@ enum AuraTab: CaseIterable {
     /// value is never used for it.
     var sticker: String {
         switch self {
-        case .home: return "AuraNavHome"
-        case .apps: return "AuraNavBlockLock"
+        case .home: return "NavHomeSticker"
+        case .apps: return "NavAppsSticker"
         case .earn: return "AuraCoinIcon"
-        case .stats: return "AuraNavStats"
-        case .profile: return "AuraNavProfileFox"
+        case .stats: return "NavStatsSticker"
+        case .profile: return "NavProfileSticker"
         }
     }
 }
@@ -88,20 +88,18 @@ struct RootTabView: View {
     @State private var debugSuccess: HabitCategory?
     @State private var purchasePreviewOwner = StorePurchasePreviewOwner()
     #endif
-    /// `-intervene` opens the blocked-app intervention on launch, so the flow
-    /// can be walked before the shield extension exists to trigger it.
+    #if DEBUG
+    /// Screenshot/debug launch arguments for previewing the intervention styles.
     @State private var showIntervention = ProcessInfo.processInfo.arguments.contains("-intervene")
         || ProcessInfo.processInfo.arguments.contains("-breathe")
         || ProcessInfo.processInfo.arguments.contains("-mirror")
         || ProcessInfo.processInfo.arguments.contains("-message")
-    /// `-breathe` forces the breathing style rather than letting the picker choose.
     private let forcedStyle: InterventionStyle? = {
         if ProcessInfo.processInfo.arguments.contains("-breathe") { return .breathing }
         if ProcessInfo.processInfo.arguments.contains("-mirror") { return .mirror }
         if ProcessInfo.processInfo.arguments.contains("-message") { return .message }
         return nil
     }()
-    #if DEBUG
     /// `-health` opens the Apple Health sheet on launch; `-health_fresh` also
     /// forgets that the permission sheet was ever shown, so it lands on the
     /// connect screen rather than the metrics list.
@@ -109,6 +107,9 @@ struct RootTabView: View {
         ProcessInfo.processInfo.arguments.contains("-health")
             || ProcessInfo.processInfo.arguments.contains("-health_fresh")
     }
+    #else
+    @State private var showIntervention = false
+    private let forcedStyle: InterventionStyle? = nil
     #endif
     @Environment(\.scenePhase) private var scenePhase
 

@@ -146,29 +146,6 @@ enum HabitTag: String, Codable, CaseIterable, Hashable {
     }
 }
 
-/// A row in the filter strip: everything, one tag, or the habits you built.
-enum HabitFilter: Hashable {
-    case all
-    case tag(HabitTag)
-    case custom
-
-    var label: String {
-        switch self {
-        case .all: return "All"
-        case .tag(let t): return t.label
-        case .custom: return "Created by me"
-        }
-    }
-
-    func matches(_ habit: Habit) -> Bool {
-        switch self {
-        case .all: return true
-        case .tag(let t): return habit.tag == t
-        case .custom: return habit.isCustom
-        }
-    }
-}
-
 /// A single habit definition — the one source of truth for its reward and how
 /// it's earned. `category` is the verification method; the rest are the
 /// user-editable defaults surfaced in the Create/Edit builder.

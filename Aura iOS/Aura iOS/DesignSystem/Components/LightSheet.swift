@@ -531,6 +531,8 @@ struct LightPrimaryButton: View {
     /// Last so trailing-closure call sites keep working.
     var action: () -> Void
 
+    private var coinSize: CGFloat { SheetType.cta * 1.35 }
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: 8) {
@@ -557,7 +559,28 @@ struct LightPrimaryButton: View {
                         .resizable()
                         .interpolation(.high)
                         .scaledToFit()
-                        .frame(width: SheetType.cta * 1.05, height: SheetType.cta * 1.05)
+                        .frame(width: coinSize, height: coinSize)
+                        .overlay {
+                            ZStack {
+                                Image(systemName: "sparkle")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .foregroundStyle(.white)
+                                    .shadow(color: .white.opacity(0.85), radius: coinSize * 0.08)
+                                    .frame(width: 17 * coinSize / 56, height: 17 * coinSize / 56)
+                                    .position(x: 44.64 * coinSize / 56,
+                                              y: 12.24 * coinSize / 56)
+                                Image(systemName: "sparkle")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .foregroundStyle(.white)
+                                    .shadow(color: .white.opacity(0.85), radius: coinSize * 0.06)
+                                    .frame(width: 11 * coinSize / 56, height: 11 * coinSize / 56)
+                                    .position(x: 10.13 * coinSize / 56,
+                                              y: 43.05 * coinSize / 56)
+                            }
+                            .frame(width: coinSize, height: coinSize)
+                        }
                     Text("\(coins)")
                         .font(titleFont)
                         .foregroundStyle(textColor)

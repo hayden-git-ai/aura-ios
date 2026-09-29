@@ -5,7 +5,7 @@
 
 import SwiftUI
 import Combine
-import AVFoundation
+@preconcurrency import AVFoundation
 
 /// Runs the (back, flippable) camera and captures a single still for the Photo
 /// Proof flow. Kept in-memory only — the captured `UIImage` is never written to

@@ -64,14 +64,19 @@ struct ExerciseCameraView: View {
     var body: some View {
         ZStack {
             cameraLayer
+            LinearGradient(
+                colors: [.clear, .black.opacity(0.12), .black.opacity(0.62)],
+                startPoint: UnitPoint(x: 0.5, y: 0.52),
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
             GeometryReader { proxy in
                 PoseSkeletonOverlay(poseLayer: controller.poseLayer,
                                     convert: converter(in: proxy.size))
             }
             .ignoresSafeArea()
             overlayUI
-
-            if showLeaveConfirm { leaveConfirm }
         }
         .background(.black)
         .statusBarHidden()
@@ -95,6 +100,10 @@ struct ExerciseCameraView: View {
             ExerciseHelpSheet(exercise: exercise)
                 .presentationDetents([.fraction(0.82)])
                 .presentationDragIndicator(.hidden)
+        }
+        .sheet(isPresented: $showLeaveConfirm) {
+            leaveConfirm
+                .auraSheet([.height(Self.leaveSheetHeight)])
         }
     }
 
@@ -260,9 +269,10 @@ struct ExerciseCameraView: View {
                 }
 
             Text(subtitle)
-                .auraFont(.body, SheetType.cardTitle, .semibold)
+                .auraFont(.body, 18, .bold)
                 .foregroundStyle(earned > 0 ? earnedGreen : LightSheet.onColour)
                 .monospacedDigit()
+                .shadow(color: .black.opacity(0.9), radius: 5, y: 2)
                 .contentTransition(.numericText())
                 .animation(.snappy(duration: 0.25), value: earned)
         }
@@ -285,7 +295,6 @@ struct ExerciseCameraView: View {
     /// The app's primary button in all three states, rather than the bespoke
     /// 58pt capsule this used to hand-roll — which made it the one CTA in the
     /// app with no drop edge, at a height on no rung of the scale.
-    @ViewBuilder
     /// Stops somebody walking away from reps they already did.
     ///
     /// Two different problems wear the same shape. Past the threshold there are
@@ -296,22 +305,22 @@ struct ExerciseCameraView: View {
     /// Leaving stays available and is never hidden behind anything. This is a
     /// screen you can be stuck in front of, half-changed, in a gym; a dialog
     /// that argues with you is worse than losing four reps.
+    private static let leaveSheetHeight: CGFloat = 332
+
     private var leaveConfirm: some View {
-        ZStack {
-            Color.black.opacity(0.55)
-                .ignoresSafeArea()
-                .onTapGesture {
-                    Haptics.impact(.light)
-                    withAnimation(.snappy(duration: 0.2)) { showLeaveConfirm = false }
-                }
+        ZStack(alignment: .top) {
+            LightSheet.bg.ignoresSafeArea()
 
             VStack(spacing: 0) {
+                LightDragCapsule()
+
                 Text(earned > 0
                      ? "You've got \(earned) coins here."
                      : "You're nearly there.")
                     .auraFont(.display, SheetType.title, .bold)
                     .foregroundStyle(SheetType.titleColor)
                     .multilineTextAlignment(.center)
+                    .padding(.top, Theme.Spacing.xl)
 
                 Text(leaveBlurb)
                     .auraFont(.body, SheetType.cardBlurb, .regular)
@@ -321,9 +330,10 @@ struct ExerciseCameraView: View {
                     .padding(.top, Theme.Spacing.s)
 
                 if earned > 0 {
-                    LightPrimaryButton(title: "Claim \(earned) coins",
-                                       face: LightSheet.green,
-                                       shade: LightSheet.greenShade) {
+                    LightPrimaryButton(title: "Claim",
+                                       coins: earned,
+                                       face: earnedGreen,
+                                       shade: earnedGreen.darkened(by: 0.14)) {
                         onFinish(units, earned)
                     }
                     .padding(.top, Theme.Spacing.xl)
@@ -343,13 +353,10 @@ struct ExerciseCameraView: View {
                 }
                 .buttonStyle(.plain)
                 .padding(.top, Theme.Spacing.s)
+                .padding(.bottom, Theme.Spacing.l)
             }
-            .padding(Theme.Spacing.xl)
-            .background(LightSheet.bg,
-                        in: RoundedRectangle(cornerRadius: Theme.Radius.panel, style: .continuous))
             .padding(.horizontal, Theme.Spacing.xl)
         }
-        .transition(.opacity)
     }
 
     private var leaveBlurb: String {
@@ -363,9 +370,10 @@ struct ExerciseCameraView: View {
     @ViewBuilder
     private var finishButton: some View {
         if earned > 0 {
-            LightPrimaryButton(title: "Claim \(earned) coins",
-                               face: LightSheet.green,
-                               shade: LightSheet.greenShade) {
+            LightPrimaryButton(title: "Claim",
+                               coins: earned,
+                               face: earnedGreen,
+                               shade: earnedGreen.darkened(by: 0.14)) {
                 onFinish(units, earned)
             }
         } else {

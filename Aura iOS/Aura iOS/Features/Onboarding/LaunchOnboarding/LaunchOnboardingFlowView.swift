@@ -61,7 +61,6 @@ struct LaunchOnboardingFlowView: View {
             case .qHabits:     OnbLaunchHabits()
             case .qLoading:    OnbLaunchLoading()
             case .qCustomPlan: OnbLaunchCustomPlan()
-            case .qReviews:    OnbLaunchReviews()
             case .qCommit:     OnbLaunchCommit()
             // Steps outside the launch sequence never become `step`; render nothing.
             default:           Color.clear

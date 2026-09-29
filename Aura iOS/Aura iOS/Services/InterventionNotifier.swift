@@ -10,8 +10,8 @@ import UserNotifications
 /// back behind the block.
 ///
 /// Local and self-contained, so it needs no extension and no server. It is the
-/// one half of the intervention flow that works today — the shield side needs
-/// the ShieldAction extension and an App Group before it can fire anything.
+/// The shield-button handoff is handled separately by `AuraShieldAction` and
+/// `AuraNotificationDelegate`; this notifier owns only purchased-time expiry.
 enum InterventionNotifier {
     private static let timeUpID = "aura.screentime.timeUp"
 

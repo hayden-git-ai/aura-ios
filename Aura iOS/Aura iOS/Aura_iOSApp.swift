@@ -6,6 +6,7 @@
 //
 
 import GoogleSignIn
+import Combine
 import SwiftUI
 #if canImport(SuperwallKit)
 import SuperwallKit
@@ -13,6 +14,7 @@ import SuperwallKit
 
 @main
 struct Aura_iOSApp: App {
+    @UIApplicationDelegateAdaptor(AuraNotificationDelegate.self) private var notificationDelegate
     // Single shared store for the whole app — see HabitStore's doc comment.
     // In-memory for now; SwiftData persistence gets added here later, driven
     // by the finalized Habit/StreakInfo types instead of the template's Item.
@@ -22,6 +24,7 @@ struct Aura_iOSApp: App {
     /// Shown once per cold launch: the splash video plays, then irises open onto
     /// whichever screen `RootGate` chose. False for the rest of the process.
     @State private var showSplash = true
+    @State private var showNotificationIntervention = false
 
     init() {
         FontRegistration.registerBundledFonts()
@@ -84,6 +87,15 @@ struct Aura_iOSApp: App {
                 #if canImport(SuperwallKit)
                 _ = Superwall.handleDeepLink(url)
                 #endif
+            }
+            .onReceive(notificationDelegate.$interventionRequestID.compactMap { $0 }) { _ in
+                showSplash = false
+                showNotificationIntervention = true
+            }
+            .fullScreenCover(isPresented: $showNotificationIntervention) {
+                InterventionView(appName: "your blocked app",
+                                 style: store.interventionStyle) {}
+                    .environment(store)
             }
         }
         // Nothing ticks while the app is away, so every countdown is stale on

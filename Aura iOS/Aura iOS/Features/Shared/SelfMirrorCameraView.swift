@@ -4,7 +4,7 @@
 //
 
 import SwiftUI
-import AVFoundation
+@preconcurrency import AVFoundation
 import Combine
 
 /// Drives a front-camera capture session. Owns the session lifecycle so the
