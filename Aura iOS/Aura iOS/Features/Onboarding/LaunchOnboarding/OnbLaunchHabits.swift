@@ -13,6 +13,7 @@ struct OnbLaunchHabits: View {
     @Environment(OnboardingFlow.self) private var flow
     @Environment(HabitStore.self) private var store
     @State private var heartPops: [UUID: Int] = [:]
+    @State private var selectedHabitIDs: Set<UUID> = []
 
     private var groups: [(tag: HabitTag, items: [Habit])] {
         let order: [HabitTag] = [.focus, .exercise, .health, .social, .creative, .home]
@@ -22,7 +23,7 @@ struct OnbLaunchHabits: View {
         }
     }
 
-    private var hasPick: Bool { store.proofHabits.contains { store.isFavorite($0) } }
+    private var hasPick: Bool { !selectedHabitIDs.isEmpty }
 
     var body: some View {
         OnbLaunchQuestionLayout(showBack: true, progress: flow.progress,
@@ -47,10 +48,10 @@ struct OnbLaunchHabits: View {
                                     rate: habit.requiresFocusSession
                                         ? "\(Int(habit.rewardRate))/hr"
                                         : "\(habit.rewardMinutes)",
-                                    isFavorite: store.isFavorite(habit),
+                                    isFavorite: selectedHabitIDs.contains(habit.id),
                                     popTrigger: heartPops[habit.id, default: 0],
-                                    onTap: { favorite(habit) },
-                                    onFavorite: { tap(); store.toggleFavorite(habit) },
+                                    onTap: { toggleSelection(habit) },
+                                    onFavorite: { toggleSelection(habit) },
                                     icon: { habitGlyph(habit) }
                                 )
                             }
@@ -61,7 +62,7 @@ struct OnbLaunchHabits: View {
             }
         } bottom: {
             onbLaunchContinue(enabled: hasPick) {
-                flow.advance()
+                saveAndContinue()
             }
         }
     }
@@ -71,12 +72,22 @@ struct OnbLaunchHabits: View {
         AudioServicesPlaySystemSound(1104)
     }
 
-    private func favorite(_ habit: Habit) {
+    private func toggleSelection(_ habit: Habit) {
         tap()
-        if !store.isFavorite(habit) {
+        if selectedHabitIDs.insert(habit.id).inserted {
             heartPops[habit.id, default: 0] += 1
+        } else {
+            selectedHabitIDs.remove(habit.id)
         }
-        store.toggleFavorite(habit)
+    }
+
+    private func saveAndContinue() {
+        // Onboarding is a fresh choice, not a reflection of favorites that may
+        // already exist in restored account data. Replace only the stock proof
+        // habit choices and preserve custom/non-proof favorites.
+        store.favoriteHabitIds.subtract(store.proofHabits.map(\.id))
+        store.favoriteHabitIds.formUnion(selectedHabitIDs)
+        flow.advance()
     }
 
     @ViewBuilder private func habitGlyph(_ habit: Habit) -> some View {

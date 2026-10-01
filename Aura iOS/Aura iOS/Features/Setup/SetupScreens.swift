@@ -791,7 +791,28 @@ struct SetupEmailSignInView: View {
                 .onSubmit { if secure { submit() } else { focused = .password } }
 
                 if secure {
-                    Button { showPassword.toggle() } label: {
+                    Button {
+                        if let pastedPassword = UIPasteboard.general.string, !pastedPassword.isEmpty {
+                            text.wrappedValue = pastedPassword
+                        }
+                        focused = .password
+                    } label: {
+                        Image(systemName: "doc.on.clipboard")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(LightSheet.controlIdle)
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Paste password")
+
+                    Button {
+                        showPassword.toggle()
+                        // Switching between SecureField and TextField replaces the
+                        // underlying UIKit control. Restore first responder on the
+                        // replacement so the keyboard does not disappear.
+                        DispatchQueue.main.async { focused = .password }
+                    } label: {
                         Image(systemName: showPassword ? "eye.fill" : "eye.slash.fill")
                             .font(.system(size: 17, weight: .semibold))
                             .foregroundStyle(LightSheet.controlIdle)
@@ -799,6 +820,7 @@ struct SetupEmailSignInView: View {
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(showPassword ? "Hide password" : "Show password")
                 }
             }
             .padding(.leading, Theme.Spacing.l)

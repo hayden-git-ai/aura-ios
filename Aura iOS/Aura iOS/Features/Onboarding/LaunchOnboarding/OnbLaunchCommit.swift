@@ -83,7 +83,6 @@ private struct OnbLaunchHoldCommit: View {
     @State private var holding = false
     @State private var done = false
     @Environment(\.scenePhase) private var scenePhase
-    @State private var commit: DispatchWorkItem?
     @State private var completion: DispatchWorkItem?
 
     private let size: CGFloat = 88
@@ -111,14 +110,27 @@ private struct OnbLaunchHoldCommit: View {
         .scaleEffect(holding ? 0.95 : 1)
         .animation(.snappy(duration: 0.2), value: holding)
         .contentShape(Circle())
-        .gesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in begin() }
-                .onEnded { _ in cancel() }
+        .onLongPressGesture(
+            minimumDuration: duration,
+            maximumDistance: 44,
+            perform: complete,
+            onPressingChanged: pressingChanged
         )
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Hold to commit")
+        .accessibilityHint("Press and hold for \(duration.formatted()) seconds")
+        .accessibilityAddTraits(.isButton)
         .onDisappear { stopInteraction() }
         .onChange(of: scenePhase) { _, value in
             if value != .active { stopInteraction() }
+        }
+    }
+
+    private func pressingChanged(_ isPressing: Bool) {
+        if isPressing {
+            begin()
+        } else {
+            cancel()
         }
     }
 
@@ -128,23 +140,21 @@ private struct OnbLaunchHoldCommit: View {
         Haptics.impact(.light)
         Haptics.startRumble(intensity: 0.35, sharpness: 0.25, duration: duration)
         withAnimation(.linear(duration: duration)) { progress = 1 }
-        let work = DispatchWorkItem {
-            done = true
-            Haptics.stopRumble()
-            Haptics.impact(.heavy)
-            let finish = DispatchWorkItem { onDone() }
-            completion = finish
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: finish)
-        }
-        commit = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + duration, execute: work)
+    }
+
+    private func complete() {
+        guard holding, !done else { return }
+        done = true
+        Haptics.stopRumble()
+        Haptics.impact(.heavy)
+        let finish = DispatchWorkItem { onDone() }
+        completion = finish
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: finish)
     }
 
     private func stopInteraction() {
         cancel()
-        commit?.cancel()
         completion?.cancel()
-        commit = nil
         completion = nil
         Haptics.stopRumble()
         holding = false
@@ -156,7 +166,6 @@ private struct OnbLaunchHoldCommit: View {
         guard holding, !done else { return }
         holding = false
         Haptics.stopRumble()
-        commit?.cancel(); commit = nil
         withAnimation(.easeOut(duration: 0.25)) { progress = 0 }
     }
 }
