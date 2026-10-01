@@ -932,11 +932,11 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Aura iOS/Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Aura;
-				INFOPLIST_KEY_NSCameraUsageDescription = "Aura shows a live view of you when you're about to unblock an app, so you can see yourself make the call.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Aura uses the camera for your habits photo verification, exercise tracking, and optional photos.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Aura reads today's steps, workouts and mindful minutes so your real-world activity can earn screen time.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Aura does not write to Apple Health. When you connect Health, Aura only reads activity to award screen-time progress.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Aura uses the microphone to record voice notes you choose to send in support chat.";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Aura lets you pick a profile photo from your library.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Aura uses selected photos for your profile and support messages.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Aura turns your speech into text when you dictate a message in the support chat.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -976,11 +976,11 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Aura iOS/Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Aura;
-				INFOPLIST_KEY_NSCameraUsageDescription = "Aura shows a live view of you when you're about to unblock an app, so you can see yourself make the call.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Aura uses the camera for your habits photo verification, exercise tracking, and optional photos.";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Aura reads today's steps, workouts and mindful minutes so your real-world activity can earn screen time.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Aura does not write to Apple Health. When you connect Health, Aura only reads activity to award screen-time progress.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Aura uses the microphone to record voice notes you choose to send in support chat.";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Aura lets you pick a profile photo from your library.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Aura uses selected photos for your profile and support messages.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Aura turns your speech into text when you dictate a message in the support chat.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;

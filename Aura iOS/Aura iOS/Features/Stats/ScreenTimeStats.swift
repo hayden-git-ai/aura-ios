@@ -196,23 +196,6 @@ enum ScreenTimeSample {
         }
     }
 
-    /// Stand-in for the previous week's total, so the trend badge has
-    /// something to measure against. TODO: real once a per-day log exists —
-    /// nothing in the store records history yet.
-    static func previousWeekTotal(_ week: [ScreenTimeDay]) -> Int {
-        Int(Double(week.reduce(0) { $0 + $1.totalMinutes }) * 0.82)
-    }
-
-    /// Stand-in for last week's brainrot share, so the split card can show
-    /// whether the mix is improving. TODO: real with a per-day log.
-    static func previousBrainrotShare(_ current: Int) -> Int { current + 4 }
-
-    /// Percentage change, rounded, guarding the divide.
-    static func delta(current: Int, previous: Int) -> Int {
-        guard previous > 0 else { return current > 0 ? 100 : 0 }
-        return Int((Double(current - previous) / Double(previous) * 100).rounded())
-    }
-
     static func durationLabel(_ minutes: Int) -> String {
         minutes >= 60 ? "\(minutes / 60)h \(minutes % 60)m" : "\(minutes)m"
     }

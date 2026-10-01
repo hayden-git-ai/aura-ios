@@ -245,8 +245,6 @@ struct ScreenTimeSummary: View {
     }
 
     private var weekTotal: Int { week.reduce(0) { $0 + $1.totalMinutes } }
-    private var previousWeek: Int { ScreenTimeSample.previousWeekTotal(week) }
-
     private var weekChart: some View {
         let peak = max(1, week.map(\.totalMinutes).max() ?? 1)
         let calendar = Calendar.current

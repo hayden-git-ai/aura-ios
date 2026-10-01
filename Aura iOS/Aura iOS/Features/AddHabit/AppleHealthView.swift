@@ -360,14 +360,9 @@ struct AppleHealthView: View {
 
             Spacer()
 
-            // Answers the question that's actually holding the thumb over the
-            // button. Both halves are true today: the share set passed to
-            // `requestAuthorization` is empty, and the numbers go straight to
-            // the local day log. Revisit the second line if earnings ever sync
-            // to a server.
-            // Plain words: "reads" and "writes to Health" is how the API talks,
-            // not how the person holding the phone thinks about it.
-            Text("Aura just looks at your activity. It never changes anything in Health, and nothing leaves your phone.")
+            // Raw HealthKit samples are processed locally. Aura may sync only
+            // the resulting in-app rewards and progress records.
+            Text("Your Health data is processed on your device. Aura may sync the rewards and progress you earn from it.")
                 .auraFont(.body, RowType.subLabel, .medium)
                 .foregroundStyle(LightSheet.onColour)
                 .multilineTextAlignment(.center)

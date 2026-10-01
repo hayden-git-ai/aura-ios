@@ -11,9 +11,9 @@
 	<array/>
 
 	<!-- Data the app or its configured services transmit or store off-device.
-	     Nothing is used for tracking. Health/Fitness is read on-device to award
-	     coins and is NOT transmitted, so it is not listed. Keep these entries and
-	     the SDK-generated privacy report in sync with App Store Connect. -->
+	     Nothing is used for tracking. Raw HealthKit samples stay on-device; derived
+	     Aura rewards and progress are declared below. Keep these entries and the
+	     SDK-generated privacy report in sync with App Store Connect. -->
 	<key>NSPrivacyCollectedDataTypes</key>
 	<array>
 		<dict>

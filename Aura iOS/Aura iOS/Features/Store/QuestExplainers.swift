@@ -145,7 +145,7 @@ enum QuestExplainer {
         steps: [
             StepsExplainerSheet.Step(
                 title: "Connect Apple Health",
-                copy: "Aura only reads your activity. Nothing leaves your phone."),
+                copy: "Your Health data is processed on your device. Aura may sync the rewards and progress you earn from it."),
             StepsExplainerSheet.Step(
                 title: "Move like you normally would",
                 copy: "Steps, workouts, mindful minutes, and calories all count."),
