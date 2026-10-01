@@ -721,10 +721,14 @@ struct UsageIcon: View {
 
     var body: some View {
         if let token = app.token {
-            Label(token)
-                .labelStyle(.iconOnly)
-                .font(.system(size: side))
-                .frame(width: side, height: side)
+            UsageAppStoreArtworkView(bundleIdentifier: app.icon, side: side) {
+                Label(token)
+                    .labelStyle(.iconOnly)
+                    .frame(width: 20, height: 20)
+                    .scaleEffect(side / 20)
+                    .frame(width: side, height: side)
+                    .clipped()
+            }
         } else {
             Image(app.icon)
                 .resizable()
@@ -733,4 +737,71 @@ struct UsageIcon: View {
                 .frame(width: side, height: side)
         }
     }
+}
+
+private struct UsageAppStoreArtworkView<Fallback: View>: View {
+    let bundleIdentifier: String
+    let side: CGFloat
+    @ViewBuilder let fallback: () -> Fallback
+
+    @State private var artworkURL: URL?
+
+    var body: some View {
+        Group {
+            if let artworkURL {
+                AsyncImage(url: artworkURL, transaction: Transaction(animation: nil)) { phase in
+                    if case .success(let image) = phase {
+                        image.resizable().interpolation(.high).scaledToFit()
+                    } else {
+                        fallback()
+                    }
+                }
+            } else {
+                fallback()
+            }
+        }
+        .frame(width: side, height: side)
+        .task(id: bundleIdentifier) {
+            artworkURL = await UsageAppStoreArtworkResolver.shared.artworkURL(for: bundleIdentifier)
+        }
+    }
+}
+
+private actor UsageAppStoreArtworkResolver {
+    static let shared = UsageAppStoreArtworkResolver()
+    private var cache: [String: URL] = [:]
+
+    func artworkURL(for bundleIdentifier: String) async -> URL? {
+        if let cached = cache[bundleIdentifier] { return cached }
+        var components = URLComponents(string: "https://itunes.apple.com/lookup")
+        components?.queryItems = [
+            URLQueryItem(name: "bundleId", value: bundleIdentifier),
+            URLQueryItem(name: "country", value: Locale.current.region?.identifier ?? "US"),
+            URLQueryItem(name: "limit", value: "1")
+        ]
+        guard let url = components?.url,
+              let (data, response) = try? await URLSession.shared.data(from: url),
+              (response as? HTTPURLResponse)?.statusCode == 200,
+              let result = try? JSONDecoder().decode(UsageAppStoreLookupResponse.self, from: data),
+              let artworkURL = result.results.first?.artworkURL else {
+            return nil
+        }
+        cache[bundleIdentifier] = artworkURL
+        return artworkURL
+    }
+}
+
+private struct UsageAppStoreLookupResponse: Decodable {
+    struct Result: Decodable {
+        let artworkUrl512: URL?
+        let artworkUrl100: URL?
+
+        var artworkURL: URL? {
+            artworkUrl512 ?? artworkUrl100.flatMap { url in
+                URL(string: url.absoluteString.replacingOccurrences(of: "100x100", with: "512x512"))
+            }
+        }
+    }
+
+    let results: [Result]
 }

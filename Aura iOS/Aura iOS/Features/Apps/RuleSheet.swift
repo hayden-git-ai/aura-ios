@@ -38,7 +38,7 @@ struct RuleSheet: View {
         var id: String {
             switch self {
             case .adult: return "adult"
-            case .remove(let icon): return "remove-\(icon.hashValue)"
+            case .remove(let icon): return "remove-\(icon.stableID)"
             }
         }
     }
@@ -63,7 +63,7 @@ struct RuleSheet: View {
                     .padding(.bottom, Theme.Spacing.xl)
                 }
 
-                LightPrimaryButton(title: "Add more apps") { pickApps() }
+                LightPrimaryButton(title: "Add more apps", face: tileBorder, textColor: .white, shade: addButtonShade) { pickApps() }
                     .padding(.horizontal, Theme.Spacing.xl)
                     .padding(.top, Theme.Spacing.m)
                     .padding(.bottom, Theme.Spacing.l)
@@ -150,7 +150,7 @@ struct RuleSheet: View {
     // MARK: - Adult websites (Forbidden only)
 
     /// Content, not apps — which is why it sits in the rule that promises
-    /// permanence. In its own gray card, the same material the app tiles wear.
+    /// permanence. Its transparent card uses the Tempting red outline.
     private var adultRow: some View {
         HStack(spacing: Theme.Spacing.s) {
             HStack(spacing: Theme.Spacing.m) {
@@ -184,13 +184,28 @@ struct RuleSheet: View {
             .tint(Theme.Color.signalGood)
         }
         .padding(Theme.Spacing.m)
-        .background(Self.tileFill,
-                    in: RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
+                .strokeBorder(LightSheet.rippleRed, lineWidth: 2)
+                .allowsHitTesting(false)
+        }
     }
 
-    /// The gray behind the app tiles and the adult card — a touch lighter than
-    /// the standard `chromeOnLight` so it reads softer on the white sheet.
-    private static let tileFill = Color.black.opacity(0.05)
+    private var tileBorder: Color {
+        switch rule {
+        case .blocked: LightSheet.forbiddenLane
+        case .distracting: LightSheet.rippleRed
+        case .allowed: LightSheet.blue
+        }
+    }
+
+    private var addButtonShade: Color {
+        switch rule {
+        case .blocked: .black
+        case .distracting: LightSheet.drainRed
+        case .allowed: LightSheet.blueShade
+        }
+    }
 
     // MARK: - Apps
 
@@ -222,7 +237,7 @@ struct RuleSheet: View {
                 }
 
                 LazyVGrid(columns: grid, alignment: .leading, spacing: Theme.Spacing.m) {
-                    ForEach(Array(icons.enumerated()), id: \.offset) { _, icon in
+                    ForEach(icons, id: \.stableID) { icon in
                         appTile(icon)
                     }
                 }
@@ -231,21 +246,19 @@ struct RuleSheet: View {
     }
 
     /// One app: the remove badge along the top, then the icon over its name — a
-    /// taller gray square, so the minus sits above the icon rather than on it.
+    /// transparent outlined card, with the minus above the icon.
     private func appTile(_ icon: AppIconSource) -> some View {
         VStack(spacing: 0) {
             HStack {
                 Spacer(minLength: 0)
                 minusBadge(icon)
             }
-            AppTileLabel(source: icon, side: 56)
+            AppTileLabel(source: icon, side: 64)
                 .padding(.bottom, Theme.Spacing.s)
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, Theme.Spacing.s)
         .padding(.top, Theme.Spacing.xs)
-        .background(Self.tileFill,
-                    in: RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous))
     }
 
     private func minusBadge(_ icon: AppIconSource) -> some View {
@@ -257,9 +270,9 @@ struct RuleSheet: View {
         } label: {
             Image(systemName: "minus")
                 .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(.white)
+                .foregroundStyle(LightSheet.rippleRed)
                 .frame(width: 22, height: 22)
-                .background(LightSheet.badge, in: Circle())
+                .overlay(Circle().strokeBorder(LightSheet.rippleRed, lineWidth: 1.5))
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)

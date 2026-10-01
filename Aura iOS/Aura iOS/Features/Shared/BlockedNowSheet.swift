@@ -41,7 +41,7 @@ struct BlockedNowSheet: View {
                             .foregroundStyle(SheetType.titleColor)
 
                         LazyVGrid(columns: grid, alignment: .leading, spacing: Theme.Spacing.m) {
-                            ForEach(Array(icons.enumerated()), id: \.offset) { _, icon in
+                            ForEach(icons, id: \.stableID) { icon in
                                 tile(icon)
                             }
                         }
@@ -60,7 +60,8 @@ struct BlockedNowSheet: View {
                     .padding(.bottom, Theme.Spacing.l)
             }
         }
-        .presentationDetents([.height(500)])
+        .preferredColorScheme(.light)
+        .presentationDetents([.height(icons.count > 3 ? 620 : 500), .large])
         .presentationDragIndicator(.hidden)
         .fullScreenCover(isPresented: $showEmergency) {
             EmergencyUnlockView()
@@ -83,35 +84,23 @@ struct BlockedNowSheet: View {
         .disabled(used)
     }
 
-    /// The frozen ice block over the app's name, in a soft gray card — sized to
-    /// match the Forbidden / Tempting / Allowed tiles. No minus badge: this list
-    /// is read-only.
+    /// Compact frozen artwork above the full-width name, with the emergency
+    /// action's red outline. This list is read-only.
+    private static let frozenIconSide: CGFloat = 54
+
     private func tile(_ icon: AppIconSource) -> some View {
-        VStack(spacing: Theme.Spacing.s) {
-            FrozenAppTile(icon: icon, side: 56)
-            appName(icon)
-                .frame(maxWidth: .infinity)
-                .multilineTextAlignment(.center)
-                .auraFont(.body, 13, .semibold)
-                .foregroundStyle(SheetType.titleColor)
-                .lineLimit(1)
-                .truncationMode(.tail)
+        // The ice PNG carries transparent pixels below its drips. A negative
+        // layout gap leaves one visible spacing step between art and title.
+        VStack(spacing: -Theme.Spacing.s) {
+            FrozenAppTile(icon: icon, side: Self.frozenIconSide)
+            AppNameView(source: icon)
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, Theme.Spacing.s)
-        .padding(.vertical, Theme.Spacing.s)
-        .background(Color.black.opacity(0.05),
-                    in: RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous))
+        .padding(.vertical, Theme.Spacing.xs)
     }
 
-    /// The app's name — the display name for a stand-in, the system title for a
-    /// real token.
-    @ViewBuilder private func appName(_ icon: AppIconSource) -> some View {
-        switch icon {
-        case .asset(let name): Text(AppCatalog.displayName(for: name))
-        case .token(let token): Label(token).labelStyle(.titleOnly)
-        }
-    }
+
 }
 
 #Preview {

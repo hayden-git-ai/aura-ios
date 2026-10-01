@@ -18,9 +18,52 @@ enum AppIconSource: Hashable, Identifiable {
     /// A bundled asset. Development and previews only.
     case asset(String)
     /// The real thing.
-    case token(ApplicationToken)
+    case token(ApplicationToken, name: String?, bundleIdentifier: String?)
+    case category(ActivityCategoryToken, name: String?)
+    case webDomain(WebDomainToken, name: String?)
+
+    private static var canonicalEncoder: JSONEncoder {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        return encoder
+    }
 
     var id: Self { self }
+
+    /// Stable identity for SwiftUI collection reuse and confirmation sheets.
+    /// Offset IDs can reuse a removed cell's old action after the array shifts.
+    var stableID: String {
+        switch self {
+        case .asset(let name): return "asset:\(name)"
+        case .token(let token, _, _):
+            guard let data = try? Self.canonicalEncoder.encode(token) else { return "token" }
+            return "token:\(data.base64EncodedString())"
+        case .category(let token, _):
+            return "category:\((try? Self.canonicalEncoder.encode(token))?.base64EncodedString() ?? "")"
+        case .webDomain(let token, _):
+            return "web:\((try? Self.canonicalEncoder.encode(token))?.base64EncodedString() ?? "")"
+        }
+    }
+
+    var displayName: String? {
+        switch self {
+        case .asset(let name): return AppCatalog.displayName(for: name)
+        case .token(_, let name, _), .category(_, let name), .webDomain(_, let name):
+            guard let name = name?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty else {
+                return nil
+            }
+            return name
+        }
+    }
+
+    var bundleIdentifier: String? {
+        guard case .token(_, _, let bundleIdentifier) = self,
+              let bundleIdentifier = bundleIdentifier?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !bundleIdentifier.isEmpty else {
+            return nil
+        }
+        return bundleIdentifier
+    }
 }
 
 extension AppSelection {
@@ -30,11 +73,33 @@ extension AppSelection {
     /// a supplement, so a live selection never shows a mixture of somebody's
     /// actual apps and our sample ones.
     var iconSources: [AppIconSource] {
-        if let decoded, !decoded.applicationTokens.isEmpty {
-            // A `Set` has no order of its own and tokens aren't sortable, so
-            // the grid can reshuffle between launches. Nothing depends on the
-            // order, and there's no ordering the system will give us.
-            return decoded.applicationTokens.map(AppIconSource.token)
+        if let decoded {
+            let applications = decoded.applications.compactMap { application -> AppIconSource? in
+                guard let token = application.token else { return nil }
+                return .token(
+                    token,
+                    name: application.localizedDisplayName,
+                    bundleIdentifier: application.bundleIdentifier
+                )
+            }
+            let categories = decoded.categories.compactMap { category -> AppIconSource? in
+                guard let token = category.token else { return nil }
+                return .category(token, name: category.localizedDisplayName)
+            }
+            let webDomains = decoded.webDomains.compactMap { domain -> AppIconSource? in
+                guard let token = domain.token else { return nil }
+                return .webDomain(token, name: domain.domain)
+            }
+
+            let namedSources = applications + categories + webDomains
+            let namedIDs = Set(namedSources.map(\.stableID))
+            let unnamedSources = decoded.applicationTokens
+                .map { AppIconSource.token($0, name: nil, bundleIdentifier: nil) }
+                + decoded.categoryTokens.map { AppIconSource.category($0, name: nil) }
+                + decoded.webDomainTokens.map { AppIconSource.webDomain($0, name: nil) }
+
+            return (namedSources + unnamedSources.filter { !namedIDs.contains($0.stableID) })
+                .sorted { $0.stableID < $1.stableID }
         }
         return mockIconNames.map(AppIconSource.asset)
     }
@@ -53,9 +118,14 @@ extension AppSelection {
             updated.appCount = updated.mockIconNames.count
             updated.categoryCount = 0
 
-        case .token(let token):
+        case .token, .category, .webDomain:
             guard var selection = decoded else { return self }
-            selection.applicationTokens.remove(token)
+            switch source {
+            case .token(let token, _, _): selection.applicationTokens.remove(token)
+            case .category(let token, _): selection.categoryTokens.remove(token)
+            case .webDomain(let token, _): selection.webDomainTokens.remove(token)
+            case .asset: break
+            }
             updated.token = try? JSONEncoder().encode(selection)
             updated.appCount = selection.applicationTokens.count + selection.webDomainTokens.count
             updated.categoryCount = selection.categoryTokens.count
