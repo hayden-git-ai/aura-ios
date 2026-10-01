@@ -27,6 +27,11 @@ struct AppGate: View {
     @State private var showReturningSignIn = false
     @State private var checkingReturningAccount = false
     @State private var retryReturningAccount = false
+    /// Separates a legitimate anonymous completion from a stale completion flag
+    /// restored on a later signed-out launch. New users must be allowed to reach
+    /// the paywall before account creation; stale signed-out sessions restart at
+    /// welcome instead.
+    @State private var completedOnboardingThisSession = false
 
     var body: some View {
         Group {
@@ -38,7 +43,7 @@ struct AppGate: View {
                     OnboardingFlowView()
                         .environment(onboarding)
                         .transition(.opacity)
-                } else if !debugHome && !store.isSignedIn && onboardingDone {
+                } else if !debugHome && !store.isSignedIn && onboardingDone && !completedOnboardingThisSession {
                     // A stale device flag must never send a signed-out user to
                     // subscription or setup. This also covers cold launch after
                     // a session expired outside the app, before onChange fires.
@@ -117,6 +122,7 @@ struct AppGate: View {
             // device-level gates must not route the anonymous state to a paywall.
             onboardingDone = false
             setupDone = false
+            completedOnboardingThisSession = false
             onboarding.step = .welcome
         }
         .onChange(of: setup.step) { _, step in
@@ -186,6 +192,7 @@ struct AppGate: View {
     private func returnToWelcome() {
         onboardingDone = false
         setupDone = false
+        completedOnboardingThisSession = false
         onboarding.step = .welcome
     }
 
@@ -202,6 +209,11 @@ struct AppGate: View {
                 _ = store.saveProfileName(firstName: onboarding.name, lastName: "")
                 setup.pendingOnboardingName = ProfileIdentity.normalizedName(onboarding.name)
             }
+            // This completion is intentional and occurred in the current app
+            // session. Mark it before flipping the persisted flag so the route
+            // falls through to SubscriptionGateView instead of mistaking it for
+            // stale signed-out state and restarting onboarding.
+            completedOnboardingThisSession = true
             withAnimation(.easeInOut(duration: 0.35)) { onboardingDone = true }
         }
         setup.onFinish = { selection in
