@@ -71,7 +71,8 @@ final class LiveScreenTimeService: ScreenTimeService {
         // at the moment somebody reaches for the app list, and nowhere else in
         // the app was requesting it at all. Without it the picker comes up
         // empty and every `apply` throws.
-        if authorizationStatus != .authorized {
+        cachedStatus = Self.read()
+        if cachedStatus != .authorized {
             guard await requestAuthorization() == .authorized else { return .empty }
         }
 
@@ -87,8 +88,17 @@ final class LiveScreenTimeService: ScreenTimeService {
             let finish: (FamilyActivitySelection?) -> Void = { result in
                 guard !didFinish else { return }   // dismiss can fire twice
                 didFinish = true
-                host.presentedViewController?.dismiss(animated: true)
-                continuation.resume(returning: result.map(Self.summarise) ?? .empty)
+                let value = result.map(Self.summarise) ?? .empty
+                // Apply the selection only after UIKit has finished dismissing.
+                // Otherwise conflict alerts and another picker presentation race
+                // the still-presented system sheet.
+                if let presented = host.presentedViewController {
+                    presented.dismiss(animated: true) {
+                        continuation.resume(returning: value)
+                    }
+                } else {
+                    continuation.resume(returning: value)
+                }
             }
 
             let picker = FamilyActivityPickerHost(
@@ -98,6 +108,7 @@ final class LiveScreenTimeService: ScreenTimeService {
             )
             let controller = UIHostingController(rootView: picker)
             controller.overrideUserInterfaceStyle = .light
+            controller.isModalInPresentation = true
             host.present(controller, animated: true)
         }
     }
@@ -265,22 +276,45 @@ final class LiveScreenTimeService: ScreenTimeService {
 /// the same wrapper around it; this one is built out of Aura's, so the only
 /// part that looks like the system is the part the system draws.
 private struct FamilyActivityPickerHost: View {
-    @State private var selection: FamilyActivitySelection
+    @State private var apps: FamilyActivitySelection
+    @State private var categories: FamilyActivitySelection
+    @State private var mode = SelectionMode.apps
     var onDone: (FamilyActivitySelection) -> Void
     var onCancel: () -> Void
+
+    private enum SelectionMode: String, CaseIterable {
+        case apps = "Apps"
+        case categories = "Whole categories"
+    }
 
     init(selection: FamilyActivitySelection,
          onDone: @escaping (FamilyActivitySelection) -> Void,
          onCancel: @escaping () -> Void) {
-        _selection = State(initialValue: selection)
+        // Apple's compact selection may collapse multiple individual apps into
+        // a category. Expanded mode retains their app tokens. Category intent
+        // is collected separately, so this cannot silently block a whole group.
+        var appSelection = FamilyActivitySelection(includeEntireCategory: true)
+        appSelection.applicationTokens = selection.applicationTokens
+        appSelection.webDomainTokens = selection.webDomainTokens
+        var categorySelection = FamilyActivitySelection(includeEntireCategory: false)
+        categorySelection.categoryTokens = selection.categoryTokens
+        _apps = State(initialValue: appSelection)
+        _categories = State(initialValue: categorySelection)
         self.onDone = onDone
         self.onCancel = onCancel
     }
 
+    private var result: FamilyActivitySelection {
+        var result = FamilyActivitySelection(includeEntireCategory: true)
+        result.applicationTokens = apps.applicationTokens
+        result.webDomainTokens = apps.webDomainTokens
+        // Only the explicit Whole categories mode contributes category tokens.
+        result.categoryTokens = categories.categoryTokens
+        return result
+    }
+
     private var count: Int {
-        selection.applicationTokens.count
-            + selection.categoryTokens.count
-            + selection.webDomainTokens.count
+        result.applicationTokens.count + result.categoryTokens.count + result.webDomainTokens.count
     }
 
     var body: some View {
@@ -289,10 +323,26 @@ private struct FamilyActivityPickerHost: View {
 
             VStack(spacing: 0) {
                 LightSubSheetHeader(title: "Choose apps",
-                                    subtitle: "Pick apps, whole categories, or websites.")
+                                    subtitle: "Apps stay separate. Choose Whole categories to add a category.")
                     .padding(.bottom, Theme.Spacing.m)
 
-                FamilyActivityPicker(selection: $selection)
+                Picker("Selection type", selection: $mode) {
+                    ForEach(SelectionMode.allCases, id: \.self) { mode in
+                        Text(mode.rawValue).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal, Theme.Spacing.xl)
+                .padding(.bottom, Theme.Spacing.s)
+
+                if mode == .apps {
+                    FamilyActivityPicker(selection: $apps)
+                } else {
+                    FamilyActivityPicker(
+                        headerText: "Select a category to include every app in it.",
+                        selection: $categories
+                    )
+                }
 
                 VStack(spacing: Theme.Spacing.m) {
                     Text(count == 1 ? "1 item selected" : "\(count) items selected")
@@ -300,7 +350,7 @@ private struct FamilyActivityPickerHost: View {
                         .foregroundStyle(LightSheet.subtitle)
 
                     LightPrimaryButton(title: "Save", enabled: count > 0) {
-                        onDone(selection)
+                        onDone(result)
                     }
 
                     Button("Cancel", action: onCancel)

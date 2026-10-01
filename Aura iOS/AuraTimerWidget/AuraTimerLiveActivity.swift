@@ -115,7 +115,7 @@ struct AuraTimerLiveActivity: Widget {
                 // style prints its own countdown above the bar, which would be
                 // a second clock on the same card, and it's the initialiser
                 // that takes it away.
-                ProgressView(timerInterval: state.startedAt...endsAt, countsDown: false) {
+                ProgressView(timerInterval: min(state.startedAt, endsAt)...endsAt, countsDown: false) {
                     EmptyView()
                 } currentValueLabel: {
                     EmptyView()
@@ -149,7 +149,11 @@ struct AuraTimerLiveActivity: Widget {
         if let paused = state.pausedRemaining {
             Text(Self.clock(paused))
         } else if let endsAt = state.endsAt {
-            Text(timerInterval: Date.now...endsAt, countsDown: true)
+            // The extension may render after expiry while the app is asleep or
+            // the first-use permission sheet is still open. Never create a
+            // reversed Date.now...endsAt range; the system clamps this stable
+            // interval at zero without needing an app update.
+            Text(timerInterval: min(state.startedAt, endsAt)...endsAt, countsDown: true)
         } else {
             // Extreme Focus: counting up, so the range is anchored at the start
             // and runs far enough ahead that it can't be reached. Nobody sits

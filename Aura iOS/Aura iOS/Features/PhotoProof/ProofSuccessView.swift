@@ -34,14 +34,8 @@ struct ProofSuccessView: View {
             : habit.rewardMinutes
     }
 
-    /// The light-blue answer to the streak sunburst's peach — Photo Proof's own hue.
-    private static let rayLighter = Color(hex: "D9E8FE")
-    private static let rayDarker = Color(hex: "C4DCFB")
-
     var body: some View {
         SunburstSuccessView(
-            rayLighter: Self.rayLighter,
-            rayDarker: Self.rayDarker,
             iconCentre: 0.26,
             artHalfHeight: 124,
             art: { SuccessCelebrationArt() },
@@ -61,6 +55,22 @@ struct ProofSuccessView: View {
         )
     }
 
+    @ViewBuilder
+    private var habitCompletionIcon: some View {
+        if let asset = habit.iconAsset {
+            EarnTileIcon(asset: asset)
+        } else {
+            // Legacy/custom habits without a sticker retain their own symbol;
+            // the verification method's camera does not identify the habit.
+            Image(systemName: habit.iconSystemName)
+                .resizable()
+                .scaledToFit()
+                .frame(height: 32)
+                .frame(width: 40, height: 40)
+                .foregroundStyle(.white)
+        }
+    }
+
     /// Times done, the reward, and the streak — plus the all-time habit ranking,
     /// matching the other screens.
     private var detail: some View {
@@ -68,7 +78,7 @@ struct ProofSuccessView: View {
         return VStack(spacing: Theme.Spacing.s) {
             HStack(spacing: Theme.Spacing.s) {
                 // The habit's own sticker and its all-time completion count.
-                EarnStatTile(icon: { EarnTileIcon(asset: habit.iconAsset ?? habit.category.tileIconAsset) },
+                EarnStatTile(icon: { habitCompletionIcon },
                              value: "\(store.timesDone(habit))", label: "Times done")
                 EarnStatTile(icon: { EarnTileIcon(asset: "EarnCardIcon") },
                              value: "+\(payout)", label: "Coins earned")

@@ -4,6 +4,8 @@
 //
 
 import SwiftUI
+import FamilyControls
+import ManagedSettings
 
 /// What you get when you open a blocked app and tap through the shield.
 ///
@@ -19,6 +21,9 @@ struct InterventionView: View {
     /// The app that was opened, if we know it. Nil until the shield extension
     /// is wired and can tell us.
     var appName: String?
+    /// Opaque real-app identity routed from the shield action. The localized
+    /// name is resolved by the Shield Configuration extension/root bridge.
+    var appToken: ApplicationToken?
     /// Only changes how the moment opens. Every style ends in the same
     /// challenge, duration and pay beats.
     var style: InterventionStyle = .dialogue
@@ -49,9 +54,11 @@ struct InterventionView: View {
     private static let options = [10, 20, 30]
 
     init(appName: String? = nil,
+         appToken: ApplicationToken? = nil,
          style: InterventionStyle = .dialogue,
          onFinish: @escaping () -> Void) {
         self.appName = appName
+        self.appToken = appToken
         self.style = style
         self.onFinish = onFinish
         _beat = State(initialValue: style.hasPreamble ? .preamble : .challenge)
@@ -62,7 +69,7 @@ struct InterventionView: View {
             if style == .message {
                 // The only style that replaces the conversation rather than
                 // opening it: the thread carries every beat itself.
-                MessageThreadView(appName: appName, onFinish: onFinish)
+                MessageThreadView(appName: appName, appToken: appToken, onFinish: onFinish)
             } else {
                 // One scene held behind the whole flow, outside the transition.
                 // The preamble and the conversation layer on top and cross-fade
@@ -79,6 +86,9 @@ struct InterventionView: View {
                 }
             }
         }
+        // Every intervention uses the full-bleed mountain/waterfall scene;
+        // keep the status-bar content white in both day and night artwork.
+        .preferredColorScheme(.dark)
     }
 
     /// The style's opening. Handing off to `.challenge` is the only thing these
@@ -148,7 +158,7 @@ struct InterventionView: View {
 
             if style == .mirror { selfView }
         }
-        .preferredColorScheme(.light)
+        .preferredColorScheme(.dark)
         .task(id: beat) { await speak() }
     }
 

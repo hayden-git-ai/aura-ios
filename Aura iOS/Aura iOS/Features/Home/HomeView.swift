@@ -13,6 +13,7 @@ import UIKit
 /// "earn time" prompt.
 struct HomeView: View {
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.notificationInterventionPresented) private var notificationInterventionPresented
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var purchaseCountupSeconds: Int?
     @State private var showPurchaseActivationError = false
@@ -179,9 +180,9 @@ struct HomeView: View {
         // always blocked, so only Distracting sets the mood.
         return Group {
             if distractingBlockedNow {
-                LoopingVideoView(resource: "HomeBlockedFox")
+                LoopingVideoView(resource: "HomeBlockedFox", isPlaying: canPresentPurchasedTime && !reduceMotion)
             } else {
-                TiredFoxFrameAnimation(fps: 30)
+                TiredFoxFrameAnimation(isPlaying: canPresentPurchasedTime, fps: 30)
             }
         }
         // 260 frame, shadow sized off it (0.51 × 0.136). Both moods share it.
@@ -285,7 +286,7 @@ struct HomeView: View {
     private var canPresentPurchasedTime: Bool {
         scenePhase == .active && !showStore && !showStreak && !showSessionStreak
             && !showRatingAsk && !showBlockedApps && !showSessionControls
-            && !store.isFlowPresented
+            && !store.isFlowPresented && !notificationInterventionPresented
     }
 
     private var purchasePresentationKey: String {

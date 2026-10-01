@@ -153,6 +153,8 @@ enum LightSheet {
     /// the "Tempting" lane, blocked-app buttons, the proof-failure ground.
     /// Promoted from a hex that was repeated across seven feature files.
     static let rippleRed = Color(hex: "FF3B30")
+    /// Shared Forbidden lane and its outlined app cards.
+    static let forbiddenLane = Color(hex: "16151C")
     /// The deeper "drained / without-Aura" red — the two-paths brainrot ground
     /// and its time-loss rates.
     static let drainRed = Color(hex: "E0413B")
@@ -239,6 +241,16 @@ enum LightSheet {
     static let passiveIncomeGold = Color(hex: "FFB923")
     static let passiveIncomeGoldWash = Color(hex: "FFF1B8")
     static let passiveIncomeGoldShade = Color(hex: "D18A00")
+    /// Reward CTA shares Apple Health setup's pink; category chrome stays gold.
+    static let passiveIncomeSuccessPink = healthPermissionPink
+    static let passiveIncomeSuccessPinkShade = Color(hex: "D52F4B")
+
+    /// Dark rays match Passive Income's OKLCH chroma while retaining each hue.
+    /// Light rays retain 65% of that color so the alternating bands stay colored.
+    static let healthySuccessRays = (darker: Color(hex: "08FCC7"), lighter: Color(hex: "5EFDDB"))
+    static let exerciseSuccessRays = (darker: Color(hex: "4198FF"), lighter: Color(hex: "84BCFF"))
+    static let focusSuccessRays = (darker: Color(hex: "9986FF"), lighter: Color(hex: "BDB0FF"))
+    static let passiveSuccessRays = (darker: Color(hex: "F36FAC"), lighter: Color(hex: "F7A1C9"))
     static let healthPermissionPink = Color(hex: "FF3B5C")
     /// The brand blue at wash strength: tip panels, the store's receipt row,
     /// a method's soft accent, a selected tile. Four pale blues did this —

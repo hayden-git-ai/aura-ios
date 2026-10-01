@@ -217,3 +217,33 @@ enum ScreenTimeSample {
         minutes >= 60 ? "\(minutes / 60)h \(minutes % 60)m" : "\(minutes)m"
     }
 }
+
+/// Lifetime average daily reduction. Usage is evaluated only inside the report;
+/// the host shares the requested dates, never reads or persists usage totals.
+enum LifetimeHoursSaved {
+    static func window(accountStart: Date, now: Date = .now,
+                       calendar: Calendar = .current) -> DateInterval {
+        let joined = calendar.startOfDay(for: accountStart)
+        let baselineStart = calendar.date(byAdding: .day, value: -7, to: joined) ?? joined
+        return DateInterval(start: baselineStart, end: max(joined, calendar.startOfDay(for: now)))
+    }
+
+    /// The first seven requested days are the pre-Aura baseline. Every remaining
+    /// completed day is part of the lifetime average, including measured zero.
+    /// Missing dates are not zero usage: incomplete history returns unavailable.
+    static func averageHoursPerDay(totals: [Date: TimeInterval], window: DateInterval,
+                                   calendar: Calendar = .current) -> Double? {
+        let start = calendar.startOfDay(for: window.start)
+        let end = calendar.startOfDay(for: window.end)
+        let count = calendar.dateComponents([.day], from: start, to: end).day ?? 0
+        guard count > 7 else { return nil }
+        var baseline = 0.0, lifetime = 0.0
+        for index in 0..<count {
+            guard let day = calendar.date(byAdding: .day, value: index, to: start),
+                  let total = totals[day], total.isFinite, total >= 0 else { return nil }
+            if index < 7 { baseline += total }
+            else { lifetime += total }
+        }
+        return max(0, baseline / 7 - lifetime / Double(count - 7)) / 3600
+    }
+}

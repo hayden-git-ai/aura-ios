@@ -29,13 +29,20 @@ struct AppGate: View {
     @State private var retryReturningAccount = false
 
     var body: some View {
-        TimelineView(.everyMinute) { context in
+        Group {
             Group {
                 if store.accountPersistenceFailed {
                     accountRecoveryView
                 } else if debugProto {
                     // Jump straight into the real Phase 4 question stretch.
                     OnboardingFlowView()
+                        .environment(onboarding)
+                        .transition(.opacity)
+                } else if !debugHome && !store.isSignedIn && onboardingDone {
+                    // A stale device flag must never send a signed-out user to
+                    // subscription or setup. This also covers cold launch after
+                    // a session expired outside the app, before onChange fires.
+                    LaunchOnboardingFlowView()
                         .environment(onboarding)
                         .transition(.opacity)
                 } else if checkingReturningAccount {
@@ -46,6 +53,7 @@ struct AppGate: View {
                             .tint(.white)
                             .foregroundStyle(.white)
                     }
+                    .preferredColorScheme(.dark)
                 } else if debugHome || (onboardingDone && subscribed && setupDone) {
                     RootTabView()
                         .transition(.opacity)
@@ -65,15 +73,15 @@ struct AppGate: View {
                     // Onboarding is done but there's no active subscription: the
                     // paywall stands between the funnel and the app. (Placeholder
                     // until onboarding screen 32 is built.)
-                    SubscriptionGateView()
+                    SubscriptionGateView(onExit: returnToWelcome)
                         .transition(.opacity)
                 } else {
                     SetupFlowView()
+                        .preferredColorScheme(setup.step == .allSet ? .dark : .light)
                         .environment(setup)
                         .transition(.opacity)
                 }
             }
-            .preferredColorScheme(preferredColorScheme(at: context.date))
         }
         .task {
             configureRoutesForLaunch()
@@ -93,6 +101,15 @@ struct AppGate: View {
                 retryReturningAccount = false
                 checkingReturningAccount = false
             }
+        }
+        .onChange(of: store.isSignedIn) { _, signedIn in
+            guard !signedIn else { return }
+            // A signed-out session must re-enter through the welcome flow. The
+            // account's local snapshot is retained by HabitStore, but these
+            // device-level gates must not route the anonymous state to a paywall.
+            onboardingDone = false
+            setupDone = false
+            onboarding.step = .welcome
         }
         .onChange(of: setup.step) { _, step in
             // Authentication is already complete for returning users; all device
@@ -138,6 +155,12 @@ struct AppGate: View {
             // entitlement check or this device's setup requirements.
             onboardingDone = true
         }
+    }
+
+    private func returnToWelcome() {
+        onboardingDone = false
+        setupDone = false
+        onboarding.step = .welcome
     }
 
     private func configureRoutesForLaunch() {
@@ -217,21 +240,6 @@ struct AppGate: View {
         if args.contains("-paywall") { onboardingDone = true; setupDone = false }
     }
     #endif
-
-    /// Keep the app's established light appearance. The setup bookends follow the
-    /// same 7am/7pm rule as HomeBackground so their system chrome always contrasts.
-    private func preferredColorScheme(at date: Date) -> ColorScheme {
-        if checkingReturningAccount { return HomeDaylight.isDay(date) ? .light : .dark }
-        guard isShowingSetup else { return .light }
-        switch setup.step {
-        case .allSet: return HomeDaylight.isDay(date) ? .light : .dark
-        default: return .light
-        }
-    }
-
-    private var isShowingSetup: Bool {
-        !debugProto && !debugHome && onboardingDone && subscribed && !setupDone
-    }
 
     /// The account has an active subscription, or a debug bypass is set. Debug
     /// (`-subscribed`) lets device builds walk past the gate before RevenueCat is

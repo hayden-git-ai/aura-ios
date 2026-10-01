@@ -43,7 +43,7 @@ struct AppleHealthView: View {
                 )
             }
         }
-        .preferredColorScheme(.light)
+        .preferredColorScheme(.dark)
         .overlay(alignment: .top) { toast }
         // Health totals only ever grow through the day, so the sheet reads them
         // fresh each time it opens rather than trusting what it had.
@@ -59,8 +59,6 @@ struct AppleHealthView: View {
             set: { if $0 == nil { collected = nil } }
         )) { payout in
             SunburstSuccessView(
-                rayLighter: LightSheet.passiveIncomeGoldWash,
-                rayDarker: Color(hex: "FFE083"),
                 iconCentre: 0.26,
                 artHalfHeight: 124,
                 art: { SuccessCelebrationArt() },

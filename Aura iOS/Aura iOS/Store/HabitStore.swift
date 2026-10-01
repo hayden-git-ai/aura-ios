@@ -117,6 +117,8 @@ final class HabitStore {
         var displayName: String
         var email: String
         var profileImageData: Data?
+        /// Optional for snapshots written before avatar freshness tracking.
+        var profileImageNeedsUpload: Bool?
         var habits: [Habit]
         var dayRecords: [DayRecord]
         var favoriteHabitIDs: Set<UUID>
@@ -262,6 +264,7 @@ final class HabitStore {
         #endif
         return AccountSnapshot(
             firstSeenAt: .now, displayName: "", email: "", profileImageData: nil,
+            profileImageNeedsUpload: false,
             habits: defaultHabits, dayRecords: [], favoriteHabitIDs: [], favoriteExerciseIDs: [],
             habitCompletionCounts: [:], exerciseCompletionCounts: [:], healthCollectCount: 0,
             healthCollectedToday: [:], healthCollectedDay: Calendar.current.startOfDay(for: .now),
@@ -282,7 +285,8 @@ final class HabitStore {
     private func currentAccountSnapshot() -> AccountSnapshot {
         AccountSnapshot(
             firstSeenAt: accountFirstSeenAt, displayName: displayName, email: email,
-            profileImageData: profileImageData, habits: habits, dayRecords: dayRecords,
+            profileImageData: profileImageData, profileImageNeedsUpload: profileImageNeedsUpload,
+            habits: habits, dayRecords: dayRecords,
             favoriteHabitIDs: favoriteHabitIds, favoriteExerciseIDs: favoriteExerciseIds,
             habitCompletionCounts: habitCompletionCounts,
             exerciseCompletionCounts: exerciseCompletionCounts,
@@ -805,19 +809,36 @@ final class HabitStore {
     /// coincidence; two numbers describing the same fact could drift the moment
     /// either changed.
     var streak: StreakInfo {
-        let days = dayRecords.last90Days()
-        // The run, with freezes bridging any missed days along the way.
         let current = dayRecords.streakRun().streak
-
-        var longest = 0, run = 0
-        for kept in days {
-            run = kept ? run + 1 : 0
-            longest = Swift.max(longest, run)
-        }
+        let longest = Self.lifetimeBestStreak(in: dayRecords)
         let lastCompleted = dayRecords.filter(\.kept).map(\.date).max()
         return StreakInfo(currentStreak: current,
                           longestStreak: Swift.max(longest, current),
                           lastCompletedDate: lastCompleted)
+    }
+
+    /// Replays all preserved account history, including freeze-protected gaps.
+    /// A previous record must not disappear when it leaves the journey window.
+    static func lifetimeBestStreak(in records: [DayRecord], now: Date = .now,
+                                   calendar: Calendar = .current) -> Int {
+        let today = calendar.startOfDay(for: now)
+        guard let start = records.map({ calendar.startOfDay(for: $0.date) })
+            .filter({ $0 <= today }).min() else { return 0 }
+        let count = (calendar.dateComponents([.day], from: start, to: today).day ?? 0) + 1
+        var longest = 0, run = 0, freezes = 0
+        for day in records.filled(from: start, days: count, calendar: calendar) {
+            if day.kept {
+                run += 1
+                longest = Swift.max(longest, run)
+                if day.habitsCompleted >= StreakFreeze.earnAt {
+                    freezes = Swift.min(StreakFreeze.maximum, freezes + 1)
+                }
+            } else if day.date < today {
+                if freezes > 0 { freezes -= 1 }
+                else { run = 0 }
+            }
+        }
+        return longest
     }
 
     // MARK: - Day log
@@ -884,6 +905,7 @@ final class HabitStore {
         displayName = snapshot.displayName
         email = snapshot.email
         profileImageData = snapshot.profileImageData
+        profileImageNeedsUpload = snapshot.profileImageNeedsUpload ?? false
         habits = snapshot.habits
         dayRecords = snapshot.dayRecords
         favoriteHabitIds = snapshot.favoriteHabitIDs
@@ -1582,10 +1604,11 @@ final class HabitStore {
 
     /// Judges photo proof.
     ///
-    /// Mock until `proofEndpoint` is filled in — see `server/README.md`. The
-    /// key for the model behind it cannot live in the app: anything in the
-    /// binary can be pulled out of it, and then the bill is somebody else's
-    /// traffic. `LiveProofVerifier` talks to our own endpoint, which holds it.
+    /// The key for the model behind photo proof cannot live in the app: anything
+    /// in the binary can be pulled out of it, and then the bill is somebody
+    /// else's traffic. `LiveProofVerifier` talks to our own endpoint, which
+    /// holds it. A non-200 response remains an unavailable result and cannot
+    /// award coins.
     let proofVerifier: ProofVerifier = {
         if let url = proofEndpoint {
             return LiveProofVerifier(endpoint: url)
@@ -1603,6 +1626,9 @@ final class HabitStore {
     private(set) var isReapplyingBlocking = false
     /// Set when the last re-apply threw, so the caller can say so.
     private(set) var lastBlockingFailed = false
+    /// A plan mutation that arrives while Screen Time is awaiting an apply.
+    /// The in-flight operation must finish, then the newest plan is applied.
+    private var blockingReapplyRequested = false
 
     /// Pushes the current plan onto the shield.
     ///
@@ -1614,16 +1640,31 @@ final class HabitStore {
     @discardableResult
     func refreshShield() async -> Bool {
         guard runsRuntimeSideEffects else { return true }
-        guard !isReapplyingBlocking else { return !lastBlockingFailed }
-        isReapplyingBlocking = true
-        lastBlockingFailed = false
-        do {
-            try await screenTime.apply(currentPlan)
-        } catch {
-            lastBlockingFailed = true
+        guard !isReapplyingBlocking else {
+            blockingReapplyRequested = true
+            return !lastBlockingFailed
         }
+        isReapplyingBlocking = true
+        var appliedPlan = currentPlan
+        repeat {
+            blockingReapplyRequested = false
+            appliedPlan = currentPlan
+            lastBlockingFailed = false
+            do {
+                try await screenTime.apply(appliedPlan)
+            } catch {
+                lastBlockingFailed = true
+            }
+            // A plan can change while apply awaits. Re-run even after an error
+            // when a newer request arrived, so the final state is not silently
+            // left behind the failed/stale attempt.
+        } while refreshShieldNeedsRetry(after: appliedPlan)
         isReapplyingBlocking = false
         return !lastBlockingFailed
+    }
+
+    private func refreshShieldNeedsRetry(after plan: ShieldPlan) -> Bool {
+        blockingReapplyRequested || currentPlan != plan
     }
 
     var appLists: [AppList] = [
@@ -1707,11 +1748,13 @@ final class HabitStore {
     var lifetimeReps: Int = HabitStore.loadLifetime(LifetimeKey.reps, seed: 1240) {
         didSet { persistActiveAccount() }
     }
-    /// Minutes held in Deep Focus sessions, all time. Bumped in
-    /// `addDeepFocusSession(durationMinutes:earnedMinutes:)`.
+    /// Completed Healthy Habits timer and Deep Focus minutes, all time.
+    /// Existing Deep Focus totals are preserved; quick proofs never add time.
     var lifetimeFocusMinutes: Int = HabitStore.loadLifetime(LifetimeKey.focusMinutes, seed: 2050) {
         didSet { persistActiveAccount() }
     }
+
+    var lifetimeFocusHours: Int { max(0, lifetimeFocusMinutes) / 60 }
 
     // MARK: - Time saved (baseline vs now)
 
@@ -2096,7 +2139,15 @@ final class HabitStore {
         subscriptionOperationInFlight = false
         let accountID = activeAccountID ?? SupabaseManager.shared.currentUserID
         subscriptionBlockedAccountID = accountID
-        _ = activateAccount(nil)
+        // Do not invalidate the auth session if the owner's snapshot could not
+        // be committed. Clearing the in-memory state first would make a storage
+        // failure look like a successful sign-out and strand the user's local
+        // streak, balance, stats, and avatar behind the recovery screen.
+        guard activateAccount(nil) else {
+            subscriptionBlockedAccountID = nil
+            subscriptionResetInProgress = false
+            return
+        }
         isSubscribed = false
         subscriptionResolvedAccountID = nil
         await entitlements.resetIdentity()
@@ -2116,17 +2167,20 @@ final class HabitStore {
     @MainActor
     private func syncProgress(_ request: (owner: UUID, revision: UInt)) async {
         guard requestIsCurrent(request) else { return }
-        if let remote = try? await SupabaseManager.shared.fetchProgress(expectedUserID: request.owner) {
-            guard requestIsCurrent(request) else { return }
-            if let remoteRecords = remote.records {
-                let merged = Self.mergeDayRecords(local: dayRecords, remote: remoteRecords)
-                if merged != dayRecords {
-                    dayRecords = merged
-                    if runsRuntimeSideEffects { DayLogFile.save(dayRecords) }
-                }
+        // A read failure is not an empty account. Do not push the local cache
+        // after a transient/network error, or a stale relaunch can replace the
+        // account's newer cloud streak and stats.
+        guard let remote = try? await SupabaseManager.shared.fetchProgress(
+            expectedUserID: request.owner) else { return }
+        guard requestIsCurrent(request) else { return }
+        if let remoteRecords = remote.records {
+            let merged = Self.mergeDayRecords(local: dayRecords, remote: remoteRecords)
+            if merged != dayRecords {
+                dayRecords = merged
+                if runsRuntimeSideEffects { DayLogFile.save(dayRecords) }
             }
-            if let remoteStats = remote.stats { applyMergedStats(remoteStats) }
         }
+        if let remoteStats = remote.stats { applyMergedStats(remoteStats) }
         guard requestIsCurrent(request) else { return }
         let records = dayRecords
         let stats = currentStats
@@ -2179,7 +2233,10 @@ final class HabitStore {
         var byDay: [Date: DayRecord] = [:]
         for record in local + remote {
             let key = calendar.startOfDay(for: record.date)
-            if let existing = byDay[key], existing.coinsEarned >= record.coinsEarned { continue }
+            if let existing = byDay[key],
+               existing.coinsEarned > record.coinsEarned
+                || (existing.coinsEarned == record.coinsEarned
+                    && existing.habitsCompleted >= record.habitsCompleted) { continue }
             byDay[key] = record
         }
         return byDay.values.sorted { $0.date < $1.date }
@@ -2248,7 +2305,17 @@ final class HabitStore {
     @MainActor
     private func syncLibrary(_ request: (owner: UUID, revision: UInt)) async {
         guard requestIsCurrent(request) else { return }
-        if let remote = try? await SupabaseManager.shared.fetchLibrary(expectedUserID: request.owner),
+        // A failed read is not proof that the account has no library. Returning
+        // instead of entering the push branch prevents stale local data from
+        // overwriting the cloud copy during a transient outage.
+        let remote: SupabaseManager.SyncLibrary?
+        do {
+            remote = try await SupabaseManager.shared.fetchLibrary(
+                expectedUserID: request.owner)
+        } catch {
+            return
+        }
+        if let remote,
            requestIsCurrent(request),
            remote.updatedAt > libraryUpdatedAt {
             isApplyingRemoteLibrary = true
@@ -2311,8 +2378,20 @@ final class HabitStore {
     /// The user's chosen profile picture (downscaled JPEG), persisted locally.
     /// nil until they pick one. Server sync waits on the account backend.
     private static let kProfileImage = "aura.profile.imageData"
+    /// Only an explicit local edit is allowed to replace the cloud avatar. A
+    /// restored cache is otherwise stale-or-unknown and must not win over the
+    /// account's remote source of truth.
+    private var profileImageNeedsUpload = false
+    /// Monotonically identifies the latest local avatar edit. Async uploads and
+    /// downloads may finish out of order, so only the latest generation may
+    /// clear the dirty bit or adopt a remote image.
+    private var profileImageRevision: UInt = 0
     var profileImageData: Data? = UserDefaults.standard.data(forKey: HabitStore.kProfileImage) {
         didSet {
+            if !isApplyingRemoteAvatar && !isApplyingAccountSnapshot {
+                profileImageRevision &+= 1
+                profileImageNeedsUpload = true
+            }
             persistActiveAccount()
             // Mirror the change to the private bucket, unless we're the ones who
             // just pulled it down.
@@ -2323,19 +2402,42 @@ final class HabitStore {
     /// True while adopting the server's avatar, so setting it doesn't echo back up.
     private var isApplyingRemoteAvatar = false
 
+    private var avatarWriteTask: Task<Void, Never>?
+
     private func syncAvatarUp() {
-        guard runsRuntimeSideEffects else { return }
-        guard let request = accountRequest() else { return }
+        guard runsRuntimeSideEffects, let request = accountRequest() else { return }
+        queueAvatarWrite(request)
+    }
+
+    /// Serialize writes as well as guarding their completion. Generation checks
+    /// alone cannot stop an older HTTP upload reaching Storage after a newer one.
+    @discardableResult
+    private func queueAvatarWrite(_ request: (owner: UUID, revision: UInt)) -> Task<Void, Never> {
+        let preceding = avatarWriteTask
         let data = profileImageData
-        Task { @MainActor [weak self, data, request] in
-            guard let self, self.requestIsCurrent(request) else { return }
-            if let data {
-                try? await SupabaseManager.shared.uploadAvatar(
-                    jpeg: data, expectedUserID: request.owner)
-            } else {
-                await SupabaseManager.shared.deleteAvatar(expectedUserID: request.owner)
+        let revision = profileImageRevision
+        let task = Task { @MainActor [weak self] in
+            await preceding?.value
+            guard let self, self.requestIsCurrent(request),
+                  self.profileImageRevision == revision,
+                  self.profileImageData == data, self.profileImageNeedsUpload else { return }
+            do {
+                if let data {
+                    try await SupabaseManager.shared.uploadAvatar(
+                        jpeg: data, expectedUserID: request.owner)
+                } else {
+                    try await SupabaseManager.shared.deleteAvatar(expectedUserID: request.owner)
+                }
+                guard self.requestIsCurrent(request), self.profileImageRevision == revision,
+                      self.profileImageData == data else { return }
+                self.profileImageNeedsUpload = false
+                self.persistActiveAccount()
+            } catch {
+                // Retain the local edit for a later retry.
             }
         }
+        avatarWriteTask = task
+        return task
     }
 
     /// Reconciles the profile picture with the bucket. A device that has one
@@ -2343,11 +2445,17 @@ final class HabitStore {
     @MainActor
     private func syncAvatar(_ request: (owner: UUID, revision: UInt)) async {
         guard requestIsCurrent(request) else { return }
-        if let local = profileImageData {
-            try? await SupabaseManager.shared.uploadAvatar(
-                jpeg: local, expectedUserID: request.owner)
-        } else if let remote = await SupabaseManager.shared.downloadAvatar(
+        if profileImageNeedsUpload {
+            await queueAvatarWrite(request).value
+            return
+        }
+
+        // A clean local cache is not evidence that it is newer than Storage.
+        // Pull the cloud copy first and never upload this cache on a read miss.
+        let revision = profileImageRevision
+        if let remote = await SupabaseManager.shared.downloadAvatar(
             expectedUserID: request.owner), requestIsCurrent(request) {
+            guard profileImageRevision == revision, !profileImageNeedsUpload else { return }
             isApplyingRemoteAvatar = true
             profileImageData = remote
             isApplyingRemoteAvatar = false
@@ -2356,11 +2464,13 @@ final class HabitStore {
 
     /// Persisted local account age, widened by any older synced history. This is
     /// an actual date basis rather than the former hard-coded 35-day sample.
+    var accountStartDate: Date {
+        min(dayRecords.map(\.date).min() ?? accountFirstSeenAt, accountFirstSeenAt)
+    }
+
     var daysSinceInstall: Int {
-        let historyStart = dayRecords.map(\.date).min() ?? accountFirstSeenAt
-        let start = min(historyStart, accountFirstSeenAt)
         return max(0, Calendar.current.dateComponents(
-            [.day], from: Calendar.current.startOfDay(for: start),
+            [.day], from: Calendar.current.startOfDay(for: accountStartDate),
             to: Calendar.current.startOfDay(for: .now)).day ?? 0)
     }
 
@@ -2463,6 +2573,9 @@ final class HabitStore {
             let reward = session.rewardMinutes
             session.endsAt = nil
             endHabitSession()
+            if sessionMethod == .photoTask {
+                lifetimeFocusMinutes += max(0, session.totalSeconds) / 60
+            }
             grantScreenTime(minutes: reward, method: sessionMethod)
             // THIS is where a focus habit counts, not where its photo passed.
             // The photo proves you started; sitting through the timer is the
@@ -2558,7 +2671,9 @@ final class HabitStore {
     /// a finished session is worth.
     @discardableResult
     func startFocusSession(lengthMinutes: Int, isUntimed: Bool, earnRate: Double) -> Bool {
-        guard !isSessionRunning, lengthMinutes > 0 else { return false }
+        // Extreme Focus has no target length, so its valid sentinel is zero.
+        // Timed sessions still require a positive duration.
+        guard !isSessionRunning, isUntimed || lengthMinutes > 0 else { return false }
         focusSessionPayout = nil
         activeFocusSession = ActiveFocusSession(
             startedAt: .now,

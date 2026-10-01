@@ -8,7 +8,7 @@ import SwiftUI
 /// Create-a-habit / edit-defaults builder. Same screen for both — pass an
 /// `existing` habit to edit it, or nil to create a new one for `method`.
 /// Laid out like the Create Blocker (Add Block) sheet: a centered avatar, a
-/// name field, a segmented mode picker, labeled field sections, and a blue
+/// name field, a segmented mode picker, labeled field sections, and a method-colored
 /// primary button.
 struct HabitBuilderView: View {
     let existing: Habit?
@@ -36,6 +36,7 @@ struct HabitBuilderView: View {
 
     private var isFocusMethod: Bool { method == .focus }
     private var usesFocus: Bool { requiresFocus || isFocusMethod }
+    private var accent: Color { method.accent }
     private var canSave: Bool { !name.trimmingCharacters(in: .whitespaces).isEmpty }
 
     private var focusModeBinding: Binding<Int> {
@@ -69,7 +70,8 @@ struct HabitBuilderView: View {
                     nameField
 
                     if !isFocusMethod {
-                        LightSegmentedPill(titles: ["Focus Habit", "Quick Habit"], selection: focusModeBinding)
+                        LightSegmentedPill(titles: ["Focus Habit", "Quick Habit"], selection: focusModeBinding,
+                                           selectedFillColor: accent)
                     }
 
                     Group {
@@ -111,12 +113,13 @@ struct HabitBuilderView: View {
                 .padding(.bottom, Theme.Spacing.l)
         }
         .background(LightSheet.bg.ignoresSafeArea())
+        .environment(\.colorScheme, .light)
         .presentationDetents([.large])
         .presentationDragIndicator(.hidden)
         .scrollDismissesKeyboard(.interactively)
         .onAppear(perform: load)
         .sheet(isPresented: $showStickerPicker) {
-            StickerPickerSheet(selected: sticker.isEmpty ? nil : sticker) { sticker = $0 ?? "" }
+            StickerPickerSheet(selected: sticker.isEmpty ? nil : sticker, accent: accent) { sticker = $0 ?? "" }
         }
         .sheet(isPresented: $showFocusPicker) {
             TargetTimePickerSheet(totalMinutes: $focusMinutes)
@@ -137,7 +140,7 @@ struct HabitBuilderView: View {
                     if sticker.isEmpty {
                         Image(systemName: "face.smiling")
                             .font(.system(size: 36, weight: .semibold))
-                            .foregroundStyle(LightSheet.blue)
+                            .foregroundStyle(accent)
                     } else {
                         Image(sticker)
                             .resizable()
@@ -147,7 +150,7 @@ struct HabitBuilderView: View {
                     }
                 }
                 .frame(width: 96, height: 96)
-                .background(LightSheet.avatarBlue, in: Circle())
+                .background(accent.opacity(0.2), in: Circle())
 
                 Image(systemName: "pencil")
                     .font(.system(size: 13, weight: .bold))
@@ -218,7 +221,7 @@ struct HabitBuilderView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .frame(height: 32)
-                    .background(selected ? LightSheet.blue : Color.white, in: Capsule())
+                    .background(selected ? accent : Color.white, in: Capsule())
                     .contentShape(Capsule())
                     .onTapGesture {
                         Haptics.selection()
@@ -274,7 +277,7 @@ struct HabitBuilderView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .frame(height: 32)
-                    .background(selected ? LightSheet.blue : Color.white, in: Capsule())
+                    .background(selected ? accent : Color.white, in: Capsule())
                     .contentShape(Capsule())
                     .onTapGesture {
                         Haptics.selection()
@@ -312,7 +315,7 @@ struct HabitBuilderView: View {
                 Spacer(minLength: Theme.Spacing.s)
                 Toggle("", isOn: $oncePerDay)
                     .labelsHidden()
-                    .tint(LightSheet.green)
+                    .tint(accent)
                     .onChange(of: oncePerDay) { _, _ in Haptics.impact(.light) }
             }
             .frame(height: 31)
@@ -322,7 +325,8 @@ struct HabitBuilderView: View {
     // MARK: - Footer
 
     private var footer: some View {
-        LightPrimaryButton(title: existing == nil ? "Create" : "Save", enabled: canSave) { save() }
+        LightPrimaryButton(title: existing == nil ? "Create" : "Save",
+                           face: accent, shade: method.accentShade, enabled: canSave) { save() }
     }
 
     // MARK: - Bindings / load / save

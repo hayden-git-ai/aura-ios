@@ -30,8 +30,7 @@ struct OnbLaunchWelcome: View {
             VStack(spacing: 0) {
                 Spacer().frame(height: Theme.Spacing.xl)
 
-                Image("PhoneMockupDark")
-                    .resizable().interpolation(.high).scaledToFit()
+                WelcomeHomePhoneMockup()
                     .frame(height: 440)
                     .shadow(color: .black.opacity(0.22), radius: 22, y: 14)
                     .overlay(alignment: .top) {
@@ -68,7 +67,7 @@ struct OnbLaunchWelcome: View {
 
                 VStack(spacing: Theme.Spacing.m) {
                     LightPrimaryButton(title: "Get started",
-                                       face: .white, textColor: LightSheet.title, shade: LightSheet.whiteShadeOnColour) { flow.advance() }
+                                       face: LightSheet.blue, textColor: .white, shade: LightSheet.blueShade) { flow.advance() }
                     Button {
                         Haptics.impact(.light)
                         flow.onSignInRequested()
@@ -84,5 +83,28 @@ struct OnbLaunchWelcome: View {
                 Spacer().frame(height: Theme.Spacing.xl)
             }
         }
+    }
+}
+
+/// Native nighttime Home capture using the App Store pose, bezel and measured aperture.
+/// Source: aura-app-store-screenshots/public and PHONE_SCREEN in constants.ts.
+private struct WelcomeHomePhoneMockup: View {
+    var body: some View {
+        GeometryReader { geometry in
+            let scale = geometry.size.width / 1022
+            ZStack(alignment: .topLeading) {
+                Image("WelcomePhoneFrame")
+                    .resizable().interpolation(.high)
+                    .saturation(0)
+                    .brightness(-0.3)
+                Image("WelcomeHomeScreenshot")
+                    .resizable().interpolation(.high).scaledToFill()
+                    .frame(width: 918 * scale, height: 1990 * scale, alignment: .top)
+                    .clipShape(RoundedRectangle(cornerRadius: 126 * scale, style: .circular))
+                    .offset(x: 52 * scale, y: 46 * scale)
+            }
+        }
+        .aspectRatio(1022.0 / 2082.0, contentMode: .fit)
+        .accessibilityLabel("Aura home screen")
     }
 }

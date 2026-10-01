@@ -398,12 +398,13 @@ final class SupabaseManager {
         guard let scopedClient = await supportClient(for: expectedUserID) else {
             return RemoteProgress(records: nil, stats: nil)
         }
-        let row: ProgressRow = try await scopedClient.from("progress")
+        let row: ProgressRow? = try await scopedClient.from("progress")
             .select("day_log,stats")
             .eq("user_id", value: expectedUserID.uuidString)
-            .single()
+            .maybeSingle()
             .execute()
             .value
+        guard let row else { return RemoteProgress(records: nil, stats: nil) }
         let records = row.day_log.data(using: .utf8)
             .flatMap { try? Self.progressDecoder.decode([DayRecord].self, from: $0) }
         let stats = row.stats.data(using: .utf8)
@@ -567,14 +568,16 @@ final class SupabaseManager {
             .download(path: avatarPath(expectedUserID))
     }
 
-    func deleteAvatar() async {
+    func deleteAvatar() async throws {
         guard let uid = currentUserID else { return }
-        await deleteAvatar(expectedUserID: uid)
+        try await deleteAvatar(expectedUserID: uid)
     }
 
-    func deleteAvatar(expectedUserID: UUID) async {
-        guard let scopedClient = await supportClient(for: expectedUserID) else { return }
-        _ = try? await scopedClient.storage.from(Self.mediaBucket)
+    func deleteAvatar(expectedUserID: UUID) async throws {
+        guard let scopedClient = await supportClient(for: expectedUserID) else {
+            throw AccountOperationError.notAuthenticated
+        }
+        try await scopedClient.storage.from(Self.mediaBucket)
             .remove(paths: [avatarPath(expectedUserID)])
     }
 

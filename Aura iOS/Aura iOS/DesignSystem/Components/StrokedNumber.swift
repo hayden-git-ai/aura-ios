@@ -38,12 +38,24 @@ struct StrokedNumber: UIViewRepresentable {
         label.setContentHuggingPriority(.required, for: .vertical)
         label.setContentCompressionResistancePriority(.required, for: .horizontal)
         label.setContentCompressionResistancePriority(.required, for: .vertical)
+        // Configure the label before SwiftUI can place its first frame. Leaving
+        // UIKit's default black text in the newly-created view caused timers to
+        // flash solid black until the first update pass supplied their colors.
+        configure(label)
         return label
     }
 
     func updateUIView(_ label: OutlinedLabel, context: Context) {
+        configure(label)
+    }
+
+    private func configure(_ label: OutlinedLabel) {
         label.font = font
+        label.fillColor = fill
+        label.outlineColor = stroke
+        label.outlineWidth = outlineWidth
         if tracking == 0 {
+            label.attributedText = nil
             label.text = text
         } else {
             // Kern on the last glyph would pad the trailing edge and push the
@@ -57,9 +69,6 @@ struct StrokedNumber: UIViewRepresentable {
             }
             label.attributedText = attributed
         }
-        label.fillColor = fill
-        label.outlineColor = stroke
-        label.outlineWidth = outlineWidth
         label.invalidateIntrinsicContentSize()
         label.setNeedsDisplay()
     }

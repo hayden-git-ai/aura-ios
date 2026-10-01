@@ -138,7 +138,18 @@ struct OnboardingFlowView: View {
             case .qCommit:     OnbCommitView()
             }
         }
+        .preferredColorScheme(statusBarColorScheme)
         .id(flow.step)
         .onAppear { flow.appear() }
+    }
+
+    private var statusBarColorScheme: ColorScheme {
+        switch flow.step {
+        case .welcome, .meet, .name, .age, .handoff, .loopDemo:
+            // These full-flow previews use the mountain/companion artwork.
+            return .dark
+        default:
+            return .light
+        }
     }
 }

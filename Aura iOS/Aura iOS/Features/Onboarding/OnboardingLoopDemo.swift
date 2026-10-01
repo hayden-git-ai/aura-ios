@@ -21,7 +21,7 @@ struct OnbLoopDemoView: View {
     @Environment(OnboardingFlow.self) private var flow
 
     @State private var scroll: CGFloat = 0
-    @State private var revealed = ProcessInfo.processInfo.arguments.contains("-verdict")
+    @State private var revealed = Self.initialVerdictRevealed
     @State private var activeReminder: ScreenTimeReminder?
     @State private var firedReminders: Set<ScreenTimeReminder> = []
     /// Once they've flicked once, the feed scrolls itself the rest of the way.
@@ -33,6 +33,14 @@ struct OnbLoopDemoView: View {
     @State private var linesReady = false          // the fox has finished typing this stage
     @State private var confettiStart: Date?        // fires when the clock hits 10:30
     @State private var clockFaded = false           // the clock fades out after the burst
+
+    private static var initialVerdictRevealed: Bool {
+        #if DEBUG
+        ProcessInfo.processInfo.arguments.contains("-verdict")
+        #else
+        false
+        #endif
+    }
 
     private let startMinutes = 22 * 60 + 30      // 10:30 PM
     private let endMinutes = 23 * 60 + 30        // 11:30 PM

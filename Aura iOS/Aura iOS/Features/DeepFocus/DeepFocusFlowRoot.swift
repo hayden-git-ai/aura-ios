@@ -45,6 +45,7 @@ struct DeepFocusFlowRoot: View {
                         withAnimation(.easeInOut(duration: 0.25)) { stage = .success(session) }
                     }
                 )
+                .preferredColorScheme(.dark)
             case .success(let session):
                 FocusSuccessView(session: session) {
                     if store.completeHabitToday() {

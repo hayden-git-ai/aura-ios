@@ -16,6 +16,7 @@ import SwiftUI
 struct InfoCard<Leading: View>: View {
     let title: String
     let copy: String
+    var borderColor: Color? = nil
     /// A glyph or sticker before the title. Nothing by default.
     @ViewBuilder var leading: Leading
 
@@ -42,7 +43,13 @@ struct InfoCard<Leading: View>: View {
         // above it; grey reads as a note set into the page.
         .background(
             RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
-                .fill(LightSheet.chromeOnLight)
+                .fill(borderColor == nil ? LightSheet.chromeOnLight : Color.clear)
+                .overlay {
+                    if let borderColor {
+                        RoundedRectangle(cornerRadius: Theme.Radius.card, style: .continuous)
+                            .strokeBorder(borderColor, lineWidth: 2)
+                    }
+                }
         )
     }
 }

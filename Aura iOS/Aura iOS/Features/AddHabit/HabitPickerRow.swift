@@ -378,7 +378,7 @@ struct FavoriteHeart: View {
 /// white plus, the same bottom-only drop edge the CTAs wear.
 struct CreateHabitButton: View {
     /// The method's colour, worn by the plus rather than the disc.
-    var color: Color = LightSheet.blue
+    var color: Color = LightSheet.healthyHabitsMint
     var action: () -> Void
 
     private let diameter: CGFloat = 68

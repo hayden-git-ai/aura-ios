@@ -37,6 +37,10 @@ private struct SplashPlayerRepresentable: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: SplashPlayerView, context: Context) {}
+
+    static func dismantleUIView(_ uiView: SplashPlayerView, coordinator: ()) {
+        uiView.cancelPlayback()
+    }
 }
 
 /// Does the real work in UIKit: a fox image view flipped through the frame
@@ -280,12 +284,22 @@ final class SplashPlayerView: UIView {
 
     private func finish() {
         guard !finished else { return }
+        cancelPlayback()
+        onFinished()
+    }
+
+    /// A notification can remove the splash before its reveal completes. Stop
+    /// immediately: the display link otherwise retains this view and its audio.
+    func cancelPlayback() {
+        guard !finished else { return }
         finished = true
         displayLink?.invalidate()
         displayLink = nil
         audioPlayer?.stop()
+        audioPlayer = nil
+        layer.removeAllAnimations()
+        raysLayer.removeAllAnimations()
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-        onFinished()
     }
 
     deinit { displayLink?.invalidate() }

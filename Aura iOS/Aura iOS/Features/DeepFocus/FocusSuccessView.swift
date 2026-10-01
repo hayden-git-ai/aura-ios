@@ -25,14 +25,8 @@ struct FocusSuccessView: View {
     @Environment(HabitStore.self) private var store
     @State private var script = FocusSuccessScript.random
 
-    /// The light-purple answer to the streak sunburst's peach.
-    private static let rayLighter = Color(hex: "EAE3FB")
-    private static let rayDarker = Color(hex: "D5C9F5")
-
     var body: some View {
         SunburstSuccessView(
-            rayLighter: Self.rayLighter,
-            rayDarker: Self.rayDarker,
             // Nudged up a touch from the fox's spot to leave room for the tiles.
             iconCentre: 0.26,
             artHalfHeight: 124,

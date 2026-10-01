@@ -44,7 +44,11 @@ enum LiveActivityController {
     /// somebody just swiped away is the sort of thing that gets an app pulled.
     static func heal() {
         guard let wanted, isAvailable, !dismissedByUser else { return }
-        guard !Activity<AuraTimerAttributes>.activities.contains(where: { $0.activityState == .active })
+        if wanted.pausedRemaining == nil, let end = wanted.endsAt, end <= .now {
+            self.end()
+            return
+        }
+        guard !Activity<AuraTimerAttributes>.activities.contains(where: { $0.activityState == .active || $0.activityState == .stale })
         else { return }
         guard Date.now.timeIntervalSince(lastRequest) > 5 else { return }
         show(wanted)
@@ -57,6 +61,10 @@ enum LiveActivityController {
     /// leaves a stale timer on the Lock Screen.
     static func show(_ state: AuraTimerAttributes.ContentState) {
         guard isAvailable else { return }
+        if state.pausedRemaining == nil, let end = state.endsAt, end <= .now {
+            self.end()
+            return
+        }
 
         // A different timer than the one that was dismissed, so the user's
         // "not this one" doesn't carry over to the next thing they start.
@@ -65,7 +73,10 @@ enum LiveActivityController {
         }
         wanted = state
 
-        let content = ActivityContent(state: state, staleDate: state.endsAt)
+        // A local countdown remains accurate without network updates. Expiry
+        // is not missing data, and staleDate does not end an activity.
+        // The system timer clamps to zero until the app can dismiss it.
+        let content = ActivityContent(state: state, staleDate: nil)
 
         if let live = adopted() {
             current = live
@@ -118,13 +129,12 @@ enum LiveActivityController {
     /// the Island blank with time still on the clock. Adopting keeps the one
     /// that's already working.
     ///
-    /// `activityState` is what makes this safe to call every sync: an activity
-    /// the user swiped away, or one the system retired, is no longer `.active`,
-    /// so it's passed over and a fresh one gets requested instead of updates
-    /// being posted into the void.
+    /// Active and stale activities can receive updates. Adopt both, including
+    /// stale activities from older app versions, rather than duplicating them.
+    /// Ended and dismissed activities are never adopted.
     private static func adopted() -> Activity<AuraTimerAttributes>? {
-        if let current, current.activityState == .active { return current }
-        return Activity<AuraTimerAttributes>.activities.first { $0.activityState == .active }
+        if let current, current.activityState == .active || current.activityState == .stale { return current }
+        return Activity<AuraTimerAttributes>.activities.first { $0.activityState == .active || $0.activityState == .stale }
     }
 
     /// Watches for the user swiping it away, which is the one disappearance

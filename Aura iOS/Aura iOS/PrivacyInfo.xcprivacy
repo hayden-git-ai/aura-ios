@@ -227,6 +227,16 @@
 				<string>35F9.1</string>
 			</array>
 		</dict>
+		<dict>
+			<!-- The custom emoji text field checks whether the system emoji keyboard
+			     is active so it can present the matching text-entry interface. -->
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryActiveKeyboards</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>54BD.1</string>
+			</array>
+		</dict>
 	</array>
 </dict>
 </plist>

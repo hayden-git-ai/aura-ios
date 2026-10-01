@@ -5,16 +5,10 @@
 
 import SwiftUI
 
-/// Curated active sticker assets, deduplicated by decoded pixels. Coins are excluded.
+/// Exactly the 22 approved Healthy Habits stickers. No generic, method,
+/// Settings, or Apple Health artwork belongs in this picker.
 enum StickerCatalog {
     static let all: [String] = [
-        "EarnCardIcon",
-        "ScrollCardIcon",
-        "StreakFireIcon",
-        "FoxPhotoProof",
-        "FoxCameraReps",
-        "FoxDeepFocus",
-        "FoxAppleHealth",
         "FoxHabitBrushTeeth",
         "FoxHabitCleanRoom",
         "FoxHabitDeepWork",
@@ -37,87 +31,62 @@ enum StickerCatalog {
         "FoxHabitWalk",
         "FoxHabitWorkOnBusiness",
         "FoxHabitYoga",
-        "FoxCaloriesBurned",
-        "FoxCreateRoutine",
-        "FoxExerciseMinutes",
-        "FoxMindfulMinutes",
-        "FoxRunWalk",
-        "FoxSettingsBugReport",
-        "FoxSettingsContact",
-        "FoxSettingsHelp",
-        "FoxSteps",
     ]
 
     // Alpha bounds measured at import time. No image decoding/scanning on scroll.
     static func geometry(for name: String) -> (width: CGFloat, height: CGFloat, x: CGFloat, y: CGFloat) {
         switch name {
-        case "EarnCardIcon": return (50.056, 50.056, 0.000, 1.229)
-        case "ScrollCardIcon": return (50.056, 50.056, 0.000, 1.676)
-        case "StreakFireIcon": return (50.000, 50.000, 0.000, 1.875)
-        case "FoxPhotoProof": return (64.606, 64.606, 0.000, 0.315)
-        case "FoxCameraReps": return (55.956, 55.956, 0.000, 0.984)
-        case "FoxDeepFocus": return (52.245, 52.245, 0.000, 1.327)
-        case "FoxAppleHealth": return (65.641, 65.641, -0.064, 0.000)
-        case "FoxHabitBrushTeeth": return (52.245, 52.245, 0.000, 1.020)
-        case "FoxHabitCleanRoom": return (52.245, 52.245, 0.000, 0.918)
-        case "FoxHabitDeepWork": return (52.379, 52.379, 0.051, 0.870)
-        case "FoxHabitGardening": return (52.245, 52.245, 0.000, 2.041)
-        case "FoxHabitGym": return (52.112, 52.112, 0.000, 0.458)
-        case "FoxHabitHealthyMeal": return (52.112, 52.112, 0.000, 0.662)
-        case "FoxHabitHydrate": return (52.112, 52.112, 0.000, 1.781)
-        case "FoxHabitJournal": return (52.112, 52.112, 0.000, -0.356)
-        case "FoxHabitMakeBed": return (52.112, 52.112, 0.000, 1.781)
-        case "FoxHabitMeditate": return (57.853, 57.853, 0.000, 1.356)
-        case "FoxHabitPracticeInstrument": return (52.245, 52.245, 0.051, 1.735)
-        case "FoxHabitRead": return (52.112, 52.112, 0.000, -1.272)
-        case "FoxHabitRun": return (52.112, 52.112, 0.000, -1.170)
-        case "FoxHabitSkincare": return (52.112, 52.112, 0.000, 1.679)
-        case "FoxHabitSmile": return (52.245, 52.245, 0.000, 1.020)
-        case "FoxHabitSocialize": return (52.245, 52.245, 0.051, 0.612)
-        case "FoxHabitStudy": return (55.054, 55.054, 0.000, 1.828)
-        case "FoxHabitTakeVitamins": return (52.112, 52.112, 0.051, 1.374)
-        case "FoxHabitTouchGrass": return (52.112, 52.112, 0.000, -0.763)
-        case "FoxHabitWalk": return (52.112, 52.112, 0.000, 1.679)
-        case "FoxHabitWorkOnBusiness": return (52.245, 52.245, 0.000, 0.816)
-        case "FoxHabitYoga": return (52.245, 52.245, 0.000, 0.510)
-        case "FoxCaloriesBurned": return (51.980, 51.980, 0.000, 0.914)
-        case "FoxCreateRoutine": return (52.112, 52.112, 0.000, 3.715)
-        case "FoxExerciseMinutes": return (52.245, 52.245, 0.000, 0.612)
-        case "FoxMindfulMinutes": return (51.980, 51.980, 0.000, 0.508)
-        case "FoxRunWalk": return (51.980, 51.980, 0.000, 1.117)
-        case "FoxSettingsBugReport": return (54.924, 54.924, 0.051, 0.355)
-        case "FoxSettingsContact": return (54.555, 54.555, 0.000, 0.254)
-        case "FoxSettingsHelp": return (52.112, 52.112, 0.000, 0.865)
-        case "FoxSteps": return (52.245, 52.245, 0.000, 0.204)
+        case "FoxHabitBrushTeeth": return (65.574, 65.574, 0.000, 0.940)
+        case "FoxHabitCleanRoom": return (65.574, 65.574, 0.000, 0.940)
+        case "FoxHabitDeepWork": return (59.159, 59.159, 0.000, 0.848)
+        case "FoxHabitGardening": return (65.312, 65.312, 0.000, 2.288)
+        case "FoxHabitGym": return (64.621, 64.621, 0.000, 0.442)
+        case "FoxHabitHealthyMeal": return (65.576, 65.576, 0.000, 0.640)
+        case "FoxHabitHydrate": return (65.312, 65.312, 0.000, 2.080)
+        case "FoxHabitJournal": return (65.312, 65.312, 0.000, -0.624)
+        case "FoxHabitMakeBed": return (58.734, 58.734, 0.000, 1.777)
+        case "FoxHabitMeditate": return (54.557, 54.557, 0.000, 1.012)
+        case "FoxHabitPracticeInstrument": return (64.794, 64.794, 0.000, 1.857)
+        case "FoxHabitRead": return (65.415, 65.415, 0.000, -1.725)
+        case "FoxHabitRun": return (64.794, 64.794, 0.000, -1.651)
+        case "FoxHabitSkincare": return (65.312, 65.312, 0.000, 1.872)
+        case "FoxHabitSmile": return (65.312, 65.312, 0.000, 1.040)
+        case "FoxHabitSocialize": return (65.576, 65.576, -0.064, 0.512)
+        case "FoxHabitStudy": return (54.427, 54.427, 0.000, 1.647)
+        case "FoxHabitTakeVitamins": return (65.312, 65.312, 0.104, 1.456)
+        case "FoxHabitTouchGrass": return (55.537, 55.537, 0.000, -0.973)
+        case "FoxHabitWalk": return (56.647, 56.647, 0.000, 1.660)
+        case "FoxHabitWorkOnBusiness": return (65.574, 65.574, 0.000, 0.940)
+        case "FoxHabitYoga": return (65.496, 65.496, 0.000, 0.416)
         default: return (40, 40, 0, 0)
         }
     }
 
     enum Category: String, CaseIterable {
         case all = "All", focus = "Focus", exercise = "Exercise", wellness = "Wellness"
-        case social = "Social", creative = "Creative", home = "Home", more = "More"
+        case social = "Social", creative = "Creative", home = "Home"
     }
 
     static func category(for name: String) -> Category {
         switch name {
-        case "FoxDeepFocus", "FoxHabitDeepWork", "FoxHabitRead", "FoxHabitStudy", "FoxHabitWorkOnBusiness", "FoxLockInRoutine": return .focus
-        case "FoxCameraReps", "FoxHabitGym", "FoxHabitRun", "FoxHabitWalk", "FoxRunWalk", "FoxSteps", "FoxExerciseMinutes", "FoxCaloriesBurned": return .exercise
-        case "FoxAppleHealth", "FoxHabitBrushTeeth", "FoxHabitHealthyMeal", "FoxHabitHydrate", "FoxHabitMeditate", "FoxHabitSkincare", "FoxHabitTakeVitamins", "FoxHabitTouchGrass", "FoxHabitYoga", "FoxMindfulMinutes": return .wellness
-        case "FoxHabitSmile", "FoxHabitSocialize", "FoxSettingsContact": return .social
+        case "FoxHabitDeepWork", "FoxHabitRead", "FoxHabitStudy", "FoxHabitWorkOnBusiness": return .focus
+        case "FoxHabitGym", "FoxHabitRun", "FoxHabitWalk": return .exercise
+        case "FoxHabitBrushTeeth", "FoxHabitHealthyMeal", "FoxHabitHydrate", "FoxHabitMeditate", "FoxHabitSkincare", "FoxHabitTakeVitamins", "FoxHabitTouchGrass", "FoxHabitYoga": return .wellness
+        case "FoxHabitSmile", "FoxHabitSocialize": return .social
         case "FoxHabitJournal", "FoxHabitPracticeInstrument": return .creative
-        case "FoxHabitCleanRoom", "FoxHabitGardening", "FoxHabitMakeBed", "FoxCreateRoutine": return .home
-        default: return .more
+        case "FoxHabitCleanRoom", "FoxHabitGardening", "FoxHabitMakeBed": return .home
+        default: return .all
         }
     }
 }
-
 /// A grid sticker picker — same sheet chrome/size as the Target Time and App
 /// Lists sheets (drag capsule + centered title + X, `.height(420)` detent). The
-/// current selection carries a blue border + a faint blue wash.
+/// current selection carries the method's accent border + wash.
 struct StickerPickerSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     let selected: String?
+    let accent: Color
     var onSelect: (String?) -> Void
 
     /// Local mirror so tapping a sticker highlights it without dismissing — the
@@ -125,8 +94,10 @@ struct StickerPickerSheet: View {
     @State private var localSelected: String?
     @State private var category: StickerCatalog.Category = .all
 
-    init(selected: String?, onSelect: @escaping (String?) -> Void) {
+    init(selected: String?, accent: Color = LightSheet.blue,
+         onSelect: @escaping (String?) -> Void) {
         self.selected = selected
+        self.accent = accent
         self.onSelect = onSelect
         _localSelected = State(initialValue: selected)
     }
@@ -149,7 +120,7 @@ struct StickerPickerSheet: View {
                                 .foregroundStyle(category == item ? .white : LightSheet.title)
                                 .padding(.horizontal, Theme.Spacing.m)
                                 .frame(height: 44)
-                                .background(category == item ? LightSheet.blue : LightSheet.field, in: Capsule())
+                                .background(category == item ? accent : LightSheet.field, in: Capsule())
                         }
                         .buttonStyle(.plain)
                     }
@@ -169,7 +140,8 @@ struct StickerPickerSheet: View {
             }
         }
         .background(LightSheet.bg.ignoresSafeArea())
-        .presentationDetents([.height(420)])
+        .preferredColorScheme(.light)
+        .presentationDetents([.medium, .large])
         .presentationDragIndicator(.hidden)
     }
 
@@ -202,12 +174,12 @@ struct StickerPickerSheet: View {
                 .offset(x: geometry.x, y: geometry.y)
                 .frame(height: 40)
                 .frame(maxWidth: .infinity)
-                .frame(height: 72)
-                .background(isSelected ? LightSheet.blueWash : LightSheet.field,
+                .frame(height: 80)
+                .background(isSelected ? accent.opacity(0.16) : LightSheet.field,
                            in: RoundedRectangle(cornerRadius: Theme.Radius.field, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: Theme.Radius.field, style: .continuous)
-                        .strokeBorder(isSelected ? LightSheet.blue : Color.clear, lineWidth: 2)
+                        .strokeBorder(isSelected ? accent : Color.clear, lineWidth: 2)
                 )
         }
         .buttonStyle(PressBounceStyle())

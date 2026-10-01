@@ -66,6 +66,9 @@ struct LaunchOnboardingFlowView: View {
             default:           Color.clear
             }
         }
+        // Welcome is the launch flow's only image-backed status-bar surface.
+        // Explicitly restore black system chrome on the following plain steps.
+        .preferredColorScheme(flow.step == .welcome ? .dark : .light)
         .id(flow.step)
         .onAppear { flow.appear() }
     }

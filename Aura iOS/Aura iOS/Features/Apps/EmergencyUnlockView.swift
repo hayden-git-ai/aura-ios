@@ -59,6 +59,7 @@ struct EmergencyUnlockView: View {
             .padding(.top, Theme.Spacing.l)
             .padding(.bottom, Theme.Spacing.xxl)
         }
+        .preferredColorScheme(.dark)
         .onAppear {
             if store.emergencyUnlockIsUsed(at: .now) {
                 used = true
@@ -97,7 +98,7 @@ struct EmergencyUnlockView: View {
     private func footer(at date: Date) -> some View {
         if used && store.emergencyUnlockIsUsed(at: date) {
             VStack(spacing: Theme.Spacing.s) {
-                Text("Pass redeemed")
+                Text("Unfreeze redeemed")
                     .auraFont(.display, SheetType.title, .bold)
                     .foregroundStyle(.white)
 
@@ -186,7 +187,7 @@ private struct EmergencyPassCard: View {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .top, spacing: Theme.Spacing.m) {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("EMERGENCY\nPASS")
+                        Text("EMERGENCY\nUNFREEZE")
                             .font(PassInk.mono(22, .heavy))
                             .foregroundStyle(PassInk.dark)
                             .fixedSize()

@@ -208,7 +208,9 @@ struct SettingsScreen: View {
         // Mode exists to remove.
         .sheet(isPresented: $confirmingExitHardMode) {
             HoldConfirmSheet(
-                sticker: "SettingsDifficulty",
+                sticker: "Lock In_End Session Sticker",
+                stickerHeight: 136,
+                stickerBottomInset: -Theme.Spacing.xl,
                 title: "Leave Hard Mode?",
                 subtitle: "Your weekly Scroll Pass comes back, and Aura can be deleted again.",
                 idleCaption: "Press and hold to leave",
@@ -372,7 +374,7 @@ struct SettingsScreen: View {
     @ViewBuilder
     private func debugScreenView(_ screen: DebugScreen) -> some View {
         let close: () -> Void = { debugScreen = nil }
-        let habit = Habit(name: "Read a book", category: .photoTask, iconAsset: "FoxHabitJournal")
+        let habit = Habit(name: "Read a book", category: .photoTask, iconAsset: "FoxHabitRead")
         switch screen {
         case .proofSuccessFocus:
             // Default habit requires a focus session: the "Start Habit Timer" variant.
@@ -381,6 +383,7 @@ struct SettingsScreen: View {
         case .proofSuccessQuick:
             // A quick habit is paid on the spot: the coins + "Claim Reward" variant.
             ProofSuccessView(habit: Habit(name: "Read a book", category: .photoTask,
+                                          iconAsset: "FoxHabitRead",
                                           requiresFocusSession: false),
                              minutes: 45, onContinue: close)
                 .environment(store)
@@ -411,9 +414,6 @@ struct SettingsScreen: View {
             // No dedicated view: Passive Income builds SunburstSuccessView inline
             // (mirroring AppleHealthView), so the preview matches the real screen.
             SunburstSuccessView(
-                // Art gradient replicating Passive Income's real health-success rays.
-                rayLighter: Color(hex: "FFDCE3"),
-                rayDarker: Color(hex: "FFC3CF"),
                 iconCentre: 0.26,
                 artHalfHeight: 124,
                 art: { SuccessCelebrationArt() },

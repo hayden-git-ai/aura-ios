@@ -56,6 +56,7 @@ struct PhotoProofFlowRoot: View {
                     },
                     onClose: { dismiss() }
                 )
+                .preferredColorScheme(.dark)
             case .camera(let habit, let minutes):
                 PhotoProofCameraView(
                     habit: habit,

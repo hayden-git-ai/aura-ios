@@ -4,7 +4,6 @@
 //
 
 import SwiftUI
-import DeviceActivity
 
 /// The Profile tab: an X-style header — a cover banner, a settable avatar that
 /// straddles the seam with the stats beside it, then the name + join year on the
@@ -24,10 +23,6 @@ struct ProfileScreen: View {
     @State private var browserLink: BrowserLink?
     /// Shared support thread — drives the unread badge on the chat FAB.
     @State private var chat = SupportChatStore.shared
-
-    /// A screen-time source of its own, so the header can show Time Saved once
-    /// a real report-hosted source is available. Samples are Debug-only.
-    private let screenTimeProvider = SampleScreenTimeProvider()
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -388,8 +383,8 @@ struct ProfileScreen: View {
             profileStatColumn(sticker: "ProfileStatHabits", iconScale: 1.02,
                               value: "\(store.lifetimeHealthyHabits)", label: "Habits done")
             profileStatColumn(sticker: "ProfileStatTimeSaved", iconScale: 1.07,
-                              value: timeSavedLabel,
-                              label: "Hours Saved")
+                              value: "\(store.lifetimeFocusHours)",
+                              label: "Focus hours")
         }
     }
 
@@ -402,15 +397,9 @@ struct ProfileScreen: View {
                     .frame(height: Self.statIconHeight)
                     .scaleEffect(iconScale)
 
-                Group {
-                    if label == "Hours Saved" {
-                        HoursSavedMetricView(fallback: value)
-                    } else {
-                        StrokedNumber(text: value,
-                                      font: Typography.displayUIFont(size: Self.statNumberSize, weight: .black, tabular: true),
-                                      fill: .black, stroke: .white, outlineWidth: 2.2)
-                    }
-                }
+                StrokedNumber(text: value,
+                              font: Typography.displayUIFont(size: Self.statNumberSize, weight: .black, tabular: true),
+                              fill: .black, stroke: .white, outlineWidth: 2.2)
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
                 .allowsTightening(true)
@@ -435,39 +424,7 @@ struct ProfileScreen: View {
         return "Joined \(Calendar.current.component(.year, from: joinDate))"
     }
 
-    private var timeSavedLabel: String {
-        guard ScreenTimeDataAvailability.displaysSampleData else { return "0" }
-        let weekTotal = screenTimeProvider.week().reduce(0) { $0 + $1.totalMinutes }
-        guard let saved = store.timeSavedMinutes(currentWeeklyMinutes: weekTotal), saved > 0 else { return "0" }
-        return String(format: "%.1fh", Double(saved) / 60)
-    }
-}
 
-private struct HoursSavedMetricView: View {
-    let fallback: String
-    var body: some View {
-#if DEBUG
-        fallbackNumber
-#else
-        ZStack {
-            // DeviceActivityReport can take a moment to attach its extension
-            // process. Keep the honest zero visible instead of leaving a hole.
-            fallbackNumber
-            DeviceActivityReport(.hoursSaved,
-                filter: DeviceActivityFilter(
-                    segment: .daily(during: DateInterval(start: Calendar.current.date(byAdding: .day, value: -14, to: Calendar.current.startOfDay(for: .now)) ?? .now, end: Calendar.current.startOfDay(for: .now))),
-                    users: .all, devices: .all))
-                .frame(width: 92, height: 32)
-        }
-#endif
-    }
-
-    private var fallbackNumber: some View {
-        StrokedNumber(text: fallback,
-                      font: Typography.displayUIFont(size: 22, weight: .black, tabular: true),
-                      fill: .black, stroke: .white, outlineWidth: 2.2)
-            .fixedSize()
-    }
 }
 
 #Preview {

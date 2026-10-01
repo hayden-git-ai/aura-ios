@@ -51,6 +51,29 @@ final class AccountIsolationTests: XCTestCase {
         }
     }
 
+    func testFocusHoursCombineTimersPersistAndNeverCountQuickProofsTwice() {
+        let fixture = Fixture(); defer { fixture.clean() }
+        let store = fixture.store()
+        XCTAssertEqual(store.lifetimeFocusHours, 0)
+        store.addDeepFocusSession(durationMinutes: 35, earnedMinutes: 35)
+        XCTAssertEqual(store.lifetimeFocusHours, 0)
+        store.activeHabitSession = ActiveHabitSession(
+            habitName: "Read", habitId: nil, rewardMinutes: 5,
+            totalSeconds: 25 * 60, endsAt: .now.addingTimeInterval(-1))
+        store.refreshClock()
+        XCTAssertEqual(store.lifetimeFocusMinutes, 60)
+        XCTAssertEqual(store.lifetimeFocusHours, 1)
+        store.refreshClock()
+        store.grantScreenTime(minutes: 7, method: .photoTask)
+        XCTAssertEqual(store.lifetimeFocusMinutes, 60)
+        let restored = fixture.store()
+        XCTAssertEqual(restored.lifetimeFocusHours, 1)
+        restored.addDeepFocusSession(durationMinutes: 59, earnedMinutes: 59)
+        XCTAssertEqual(restored.lifetimeFocusHours, 1)
+        restored.addDeepFocusSession(durationMinutes: 1, earnedMinutes: 1)
+        XCTAssertEqual(restored.lifetimeFocusHours, 2)
+    }
+
     private let watermarkDay = Date(timeIntervalSince1970: 1_700_000_000)
 
     func testPendingPurchaseSurvivesRelaunchAndActivatesOnlyOnce() {
@@ -205,6 +228,18 @@ final class AccountIsolationTests: XCTestCase {
         XCTAssertEqual(store.coinBalance, 0)
     }
 
+    func testExtremeFocusStartsWithNoTargetLength() {
+        let fixture = Fixture(); defer { fixture.clean() }
+        let store = fixture.store()
+
+        XCTAssertTrue(store.startFocusSession(lengthMinutes: 0, isUntimed: true, earnRate: 60))
+        XCTAssertTrue(store.activeFocusSession?.isOpenEnded == true)
+        XCTAssertEqual(store.activeFocusSession?.lengthMinutes, 0)
+        XCTAssertEqual(store.finishFocusSession(banking: true), 0)
+        XCTAssertFalse(store.startFocusSession(lengthMinutes: 0, isUntimed: false, earnRate: 60))
+        XCTAssertNil(store.activeFocusSession)
+    }
+
     func testCompletedHabitPaysOnceWithoutUnlockingAfterRelaunch() {
         let fixture = Fixture(); defer { fixture.clean() }
         let store = fixture.store()
@@ -254,6 +289,33 @@ final class AccountIsolationTests: XCTestCase {
         fixture.currentUserID = fixture.ownerB
         XCTAssertTrue(store.activateAccount(fixture.ownerB))
         assertAccount(store, purchaseMinutes: 29, watermark: 640)
+    }
+
+    func testAccountRoundTripRestoresProfilePhotoStreakStatsAndCoinBalance() {
+        let fixture = Fixture(currentUserID: nil); defer { fixture.clean() }
+        let store = fixture.store()
+        fixture.currentUserID = fixture.ownerA
+        XCTAssertTrue(store.activateAccount(fixture.ownerA))
+
+        store.profileImageData = Data("Jesse-avatar".utf8)
+        let habit = try! XCTUnwrap(store.proofHabits.first)
+        XCTAssertTrue(store.completeHabitToday(habit: habit))
+        store.grantScreenTime(minutes: 25, method: .focus)
+        XCTAssertEqual(store.coinBalance, 25)
+        XCTAssertEqual(store.lifetimeHealthyHabits, 1)
+        XCTAssertEqual(store.streak.currentStreak, 1)
+
+        // This is the same local handoff used by sign-out: activate the signed-
+        // out scope, then restore the authenticated owner. It must not use the
+        // empty signed-out snapshot as the source for the next login.
+        XCTAssertTrue(store.activateAccount(nil))
+        XCTAssertEqual(store.coinBalance, 0)
+        XCTAssertTrue(store.activateAccount(fixture.ownerA))
+
+        XCTAssertEqual(store.profileImageData, Data("Jesse-avatar".utf8))
+        XCTAssertEqual(store.coinBalance, 25)
+        XCTAssertEqual(store.lifetimeHealthyHabits, 1)
+        XCTAssertEqual(store.streak.currentStreak, 1)
     }
 
     func testRelaunchRestoresPersistedAccountState() {

@@ -9,6 +9,8 @@ section only unless they are doing a process audit.
 
 ## Current Lessons Agents Must Follow
 
+- Before packaging a TestFlight upload, check remaining disk space after the archive finishes. Build 9 packaging failed with a corrupt-package rejection at 119 MiB free; clearing only regenerable compilation caches restored 5.4 GiB and the retry uploaded successfully. Preserve signed archives, source, and evidence.
+
 - Device-test packets must explicitly include reversible in-app state changes
   (selection, focus timers, earned-time spending); inspecting screens alone does
   not test behavior. Verify unfamiliar controls against source before declaring
@@ -49,6 +51,23 @@ section only unless they are doing a process audit.
   nonempty frames and clean silhouettes do not prove preserved facial detail.
   Sandbox codec failures do not prove host incompatibility. DEBUG-only fixes do not ship.
   Require an integrated build after parser checks, then verify the visible result.
+  Build 8 still showed undersized native token icons, an oversized avatar,
+  missing Hours Saved, uncentered names and generic intervention copy. Mock
+  icons, asset hashes and compiler success do not verify remote FamilyControls
+  views or the installed sticker picker. Match each acceptance claim to a
+  screenshot/action from the exact installed build; keep untested items open.
+  Mirroring access and Xcode installation access are separate: check Developer
+  Mode and device details before asking for repeated cable reconnections. Keep
+  temporary diagnostics explicitly opt-in and removable without blocking the
+  normal app; failed native-label experiments are not completed fixes.
+  The sticker approval was an exact 22-item allowlist, not permission to retain
+  extra generic choices. Compare the complete displayed set to that approval
+  before outlining, building, or reporting completion.
+  September 30 integration exposed missing SDK imports and invalid extension
+  overloads after syntax-only worker checks: parser success is never a compiled
+  handoff. Root must inspect target membership and compare extension-point IDs
+  against installed Xcode templates: a signed archive can still be rejected by
+  App Store Connect for an invalid extension identifier.
 - Never let raw analytics firehoses into Slack. Use digest or threshold-based
   reporting only.
 - Treat Astra low as the default orchestrator for meaningful work. Escalate model
@@ -97,3 +116,6 @@ Add older lessons below this line during monthly coding-system review.
 ### 2026-09-19 — Earn card export bounds
 - Failure: SVGs without explicit intrinsic dimensions rasterized at an unexpected size, causing cropped borders and transparent padding in the native grid.
 - Correction: set explicit SVG width/height before rasterizing, verify alpha bounds span the intended export, then inspect the installed grid after startup and animation complete.
+
+
+September 30 profile correction: a simulator-only placeholder did not validate the Release-only DeviceActivity report surface. Avoid remote report hosts for native profile counters; verify the same rendering path in Debug and Release. Focus hours now uses the shared StrokedNumber in both.

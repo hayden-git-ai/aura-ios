@@ -42,6 +42,7 @@ struct ExerciseFlowRoot: View {
                     },
                     onClose: { dismiss() }
                 )
+                .preferredColorScheme(.dark)
             case .camera(let exercise):
                 ExerciseCameraView(
                     exercise: exercise,

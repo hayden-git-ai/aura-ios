@@ -329,6 +329,8 @@ struct ExerciseCameraView: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, Theme.Spacing.s)
 
+                Spacer(minLength: 0)
+
                 if earned > 0 {
                     LightPrimaryButton(title: "Claim",
                                        coins: earned,

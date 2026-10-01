@@ -267,7 +267,7 @@ struct HabitDetailScaffold<Rows: View>: View {
                     // than the 33 the stack would give it.
                     .padding(.top, -Theme.Spacing.m)
 
-                    InfoCard(title: "Tip from Aura", copy: tip) {
+                    InfoCard(title: "Tip from Aura", copy: tip, borderColor: accent) {
                         Image("AuraAppIcon")
                             .resizable()
                             .interpolation(.high)
@@ -306,10 +306,10 @@ struct HabitDetailScaffold<Rows: View>: View {
                             Image(systemName: "square.and.arrow.up")
                                 .font(.system(size: 13, weight: .bold))
                         }
-                        .foregroundStyle(LightSheet.title)
+                        .foregroundStyle(accent)
                         .padding(.horizontal, Theme.Spacing.l)
                         .padding(.vertical, Theme.Spacing.m)
-                        .background(LightSheet.chromeOnLight, in: Capsule())
+                        .overlay(Capsule().strokeBorder(accent, lineWidth: 2))
                     }
                     .buttonStyle(PressBounceStyle())
                 }
@@ -346,7 +346,7 @@ struct HabitDetailScaffold<Rows: View>: View {
         }
         // White status-bar glyphs, since the top of this screen is the blue
         // header rather than the light body.
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(.light)
     }
 
     /// Blue field with a white dome cut out of the bottom, the sticker resting

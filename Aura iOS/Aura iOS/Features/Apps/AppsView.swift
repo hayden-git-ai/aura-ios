@@ -123,7 +123,7 @@ struct AppsView: View {
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: Theme.Spacing.l) {
-                        ForEach(Array(store.blockedNowIcons.enumerated()), id: \.offset) { idx, icon in
+                        ForEach(Array(store.blockedNowIcons.enumerated()), id: \.element.stableID) { idx, icon in
                             FrozenAppTile(icon: icon, side: 56,
                                           tilt: Self.frozenTilts[idx % Self.frozenTilts.count])
                         }

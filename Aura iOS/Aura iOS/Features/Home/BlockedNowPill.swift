@@ -32,7 +32,7 @@ struct BlockedNowPill: View {
                 // views draw on top in an HStack, so the count tile lands in
                 // front of the icons without any zIndex juggling.
                 HStack(spacing: -Theme.Spacing.s) {
-                    ForEach(Array(visible.enumerated()), id: \.offset) { _, icon in
+                    ForEach(visible, id: \.stableID) { icon in
                         // Plain app icons (no frost tint) wrapped in the app's
                         // sticker chrome — white keyline + soft shadow.
                         AppIconView(source: icon, side: 18)

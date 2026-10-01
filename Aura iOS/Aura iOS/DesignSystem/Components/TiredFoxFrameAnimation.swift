@@ -28,6 +28,9 @@ import SwiftUI
 /// the resident cost is ~1MB/frame rather than the ~4MB/frame a 1024px source
 /// would incur.
 struct TiredFoxFrameAnimation: View {
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    var isPlaying: Bool = true
     /// Playback rate. The loop length is `frameCount / fps` — e.g. 120 frames
     /// at 24fps is a 5.0s loop; at 30fps it's a 4.0s loop.
     var fps: Double = 24
@@ -55,7 +58,7 @@ struct TiredFoxFrameAnimation: View {
                 // Holds the layout slot until the frames decode.
                 Color.clear
             } else {
-                TimelineView(.animation) { context in
+                TimelineView(.animation(paused: !isPlaying || scenePhase != .active || reduceMotion)) { context in
                     Image(uiImage: frames[frameIndex(at: context.date)])
                         .resizable()
                         .interpolation(.high)
@@ -70,6 +73,12 @@ struct TiredFoxFrameAnimation: View {
         .onDisappear {
             // Drop the clock so the next appear restarts cleanly from frame 0.
             startedAt = nil
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { startedAt = Date() }
+        }
+        .onChange(of: isPlaying) { _, playing in
+            if playing { startedAt = Date() }
         }
     }
 

@@ -4,6 +4,8 @@
 //
 
 import SwiftUI
+import FamilyControls
+import ManagedSettings
 
 /// The intervention as a text thread with the fox.
 ///
@@ -17,6 +19,7 @@ import SwiftUI
 /// said.
 struct MessageThreadView: View {
     var appName: String?
+    var appToken: ApplicationToken?
     var onFinish: () -> Void
 
     @Environment(HabitStore.self) private var store
@@ -190,7 +193,9 @@ struct MessageThreadView: View {
                 }
             }
         }
-        .preferredColorScheme(.light)
+        // The message thread is also full-bleed waterfall art, so its status
+        // bar must use white content rather than the light-sheet treatment.
+        .preferredColorScheme(.dark)
         .task { await open() }
     }
 
@@ -524,6 +529,6 @@ private struct ContentHeightKey: PreferenceKey {
 }
 
 #Preview {
-    MessageThreadView(appName: "Instagram") {}
+    MessageThreadView(appName: "Instagram", appToken: nil) {}
         .environment(HabitStore())
 }

@@ -37,7 +37,9 @@ struct HoldToConfirmButton: View {
     private enum Phase { case idle, holding, done }
     @State private var phase: Phase = .idle
     @State private var progress: CGFloat = 0
+    @Environment(\.scenePhase) private var scenePhase
     @State private var commit: DispatchWorkItem?
+    @State private var completion: DispatchWorkItem?
     @State private var dots = 0
     @State private var dotTimer: Timer?
 
@@ -91,6 +93,10 @@ struct HoldToConfirmButton: View {
                     .onChanged { _ in begin() }
                     .onEnded { _ in cancel() }
             )
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(caption)
+            .accessibilityHint("Press and hold for \(Int(duration)) seconds")
+            .accessibilityAddTraits(.isButton)
 
             HStack(spacing: 0) {
                 Text(caption)
@@ -122,6 +128,10 @@ struct HoldToConfirmButton: View {
                     radius: captionShadow ? 3 : 0, y: captionShadow ? 1 : 0)
             .animation(.easeInOut(duration: 0.2), value: phase)
         }
+        .onDisappear { stopInteraction() }
+        .onChange(of: scenePhase) { _, value in
+            if value != .active { stopInteraction() }
+        }
     }
 
     /// The white fingerprint: a faint base print with a solid-white print over
@@ -152,6 +162,8 @@ struct HoldToConfirmButton: View {
     private func begin() {
         guard phase == .idle else { return }
         phase = .holding
+        Haptics.impact(.light)
+        Haptics.startRumble(intensity: 0.35, sharpness: 0.25, duration: duration)
 
         // Reduced motion still has to be holdable, so the ring jumps to full
         // rather than sweeping.
@@ -165,13 +177,28 @@ struct HoldToConfirmButton: View {
 
         let work = DispatchWorkItem {
             stopDots()
+            Haptics.stopRumble()
+            Haptics.impact(.heavy)
             phase = .done
             // A beat on the check before handing back, so the commit lands
             // and is read before the sheet closes out from under it.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) { action() }
+            let finish = DispatchWorkItem { action() }
+            completion = finish
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.9, execute: finish)
         }
         commit = work
         DispatchQueue.main.asyncAfter(deadline: .now() + duration, execute: work)
+    }
+
+    private func stopInteraction() {
+        cancel()
+        commit?.cancel()
+        completion?.cancel()
+        commit = nil
+        completion = nil
+        Haptics.stopRumble()
+        phase = .idle
+        progress = 0
     }
 
     private func stopDots() {
@@ -184,6 +211,7 @@ struct HoldToConfirmButton: View {
         commit?.cancel()
         commit = nil
         stopDots()
+        Haptics.stopRumble()
         phase = .idle
         withAnimation(.easeOut(duration: 0.25)) { progress = 0 }
     }

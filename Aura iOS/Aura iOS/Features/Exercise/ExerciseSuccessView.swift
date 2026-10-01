@@ -24,15 +24,8 @@ struct ExerciseSuccessView: View {
     /// Picked once on appear so it can't change under the user mid-animation.
     @State private var script = ExerciseSuccessScript.random
 
-    /// The light-orange answer to the streak sunburst's peach — Camera Reps' own
-    /// hue, matching what Lock In does in purple.
-    private static let rayLighter = Color(hex: "FFE7C8")
-    private static let rayDarker = Color(hex: "FFD29B")
-
     var body: some View {
         SunburstSuccessView(
-            rayLighter: Self.rayLighter,
-            rayDarker: Self.rayDarker,
             // Same as the other success screens now that they all carry a detail.
             iconCentre: 0.26,
             artHalfHeight: 124,

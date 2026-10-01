@@ -108,7 +108,7 @@ struct ExerciseHelpSheet: View {
     /// because the steps are the same every time and this is the part that
     /// changes.
     private var tip: some View {
-        InfoCard(title: "Tip from Aura", copy: exercise.formTip) {
+        InfoCard(title: "Tip from Aura", copy: exercise.formTip, borderColor: HabitCategory.exercise.accent) {
             Image("AuraAppIcon")
                 .resizable()
                 .interpolation(.high)

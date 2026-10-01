@@ -78,6 +78,7 @@ struct StreakCelebrationView: View {
         // The same rotating peach sunburst as the Home streak screen, so the
         // post-quest celebration and the streak destination read as one place.
         .background(SunburstBackground().ignoresSafeArea())
+        .preferredColorScheme(.light)
         .onAppear(perform: animateIn)
     }
 

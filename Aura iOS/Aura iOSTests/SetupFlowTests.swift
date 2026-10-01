@@ -71,6 +71,19 @@ final class SetupFlowTests: XCTestCase {
         XCTAssertEqual(session.earnedMinutes(at: started.addingTimeInterval(15 * 60)), 15)
     }
 
+    func testExtremeFocusPaysOnlyWholeElapsedMinutes() {
+        let started = Date(timeIntervalSince1970: 1_000)
+        let session = ActiveFocusSession(startedAt: started,
+                                         endsAt: nil,
+                                         lengthMinutes: 0,
+                                         earnRate: 60)
+
+        XCTAssertTrue(session.isOpenEnded)
+        XCTAssertEqual(session.earnedMinutes(at: started.addingTimeInterval(59)), 0)
+        XCTAssertEqual(session.earnedMinutes(at: started.addingTimeInterval(60)), 1)
+        XCTAssertEqual(session.earnedMinutes(at: started.addingTimeInterval(125)), 2)
+    }
+
     func testProfileNamesAllowSingleNamesAndNormalizeWhitespace() {
         XCTAssertTrue(ProfileIdentity.isValidName("Hayden"))
         XCTAssertTrue(ProfileIdentity.isValidName("李明"))

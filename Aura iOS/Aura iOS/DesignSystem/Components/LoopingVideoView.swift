@@ -31,6 +31,10 @@ struct LoopingVideoView: UIViewRepresentable {
     func updateUIView(_ uiView: LoopingPlayerView, context: Context) {
         uiView.setPlaying(isPlaying)
     }
+
+    static func dismantleUIView(_ uiView: LoopingPlayerView, coordinator: ()) {
+        uiView.setPlaying(false)
+    }
 }
 
 final class LoopingPlayerView: UIView {
@@ -63,6 +67,12 @@ final class LoopingPlayerView: UIView {
         // intermittent black band through the video.
 
         looper = AVPlayerLooper(player: queue, templateItem: AVPlayerItem(url: url))
+        NotificationCenter.default.addObserver(self, selector: #selector(playbackEnvironmentChanged),
+            name: UIApplication.didBecomeActiveNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(playbackEnvironmentChanged),
+            name: UIApplication.willResignActiveNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(audioInterruptionChanged(_:)),
+            name: AVAudioSession.interruptionNotification, object: nil)
         reconcilePlayback()
     }
 
@@ -74,7 +84,20 @@ final class LoopingPlayerView: UIView {
     }
 
     private func reconcilePlayback() {
-        if wantsPlayback && window != nil { queue.play() } else { queue.pause() }
+        if wantsPlayback && window != nil && UIApplication.shared.applicationState == .active {
+            queue.play()
+        } else {
+            queue.pause()
+        }
+    }
+
+    @objc private func playbackEnvironmentChanged() { reconcilePlayback() }
+
+    @objc private func audioInterruptionChanged(_ notification: Notification) {
+        guard let raw = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
+              AVAudioSession.InterruptionType(rawValue: raw) == .ended else { return }
+        // This player is silent; resume only when its owning screen is visible.
+        reconcilePlayback()
     }
 
     // Pause when pulled off-screen, resume when returned — no wasted decode.
@@ -82,4 +105,6 @@ final class LoopingPlayerView: UIView {
         super.didMoveToWindow()
         reconcilePlayback()
     }
+
+    deinit { NotificationCenter.default.removeObserver(self) }
 }

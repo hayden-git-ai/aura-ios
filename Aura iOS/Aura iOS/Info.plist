@@ -16,6 +16,8 @@
 	-->
 	<key>CFBundleName</key>
 	<string>Aura</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

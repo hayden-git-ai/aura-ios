@@ -160,7 +160,11 @@ Deno.serve(async (request: Request): Promise<Response> => {
         // Both providers down. Fall through to the 502 below.
       }
     }
-    return json({ error: String(geminiError) }, 502);
+    // Keep provider diagnostics in function logs. Returning the raw provider
+    // response leaks operational detail to clients and still cannot help the
+    // camera flow recover. The iOS client treats every non-200 as unavailable.
+    console.error("verify-proof: providers unavailable", String(geminiError));
+    return json({ error: "photo verification temporarily unavailable" }, 502);
   }
 });
 
@@ -399,28 +403,42 @@ async function judgeFallback(
 /**
  * The judgement, and the voice it answers in.
  *
- * Two things it has to get right. It must be strict enough that a photo of a
- * screen doesn't pass. People will try, and a verifier that can be beaten by
- * pointing a phone at a phone is decoration. And it must be generous about
- * everything else: this is somebody who just did the thing, and a fussy
- * verifier costs them the reward they earned.
+ * Screen-based work is legitimate evidence for computer-based habits.
+ * Distinguish that from showing a picture of a physical habit as fake proof.
  *
  * `reason` and `fix` are asked for separately because the failure screen shows
  * them as two lines and they do different jobs. Rolled into one sentence, the
  * diagnosis swallows the instruction, and the instruction is the part that
  * gets somebody to a passing photo.
  */
+// Model-facing evidence criteria are independent of Aura's conversational UI tips.
+// Listed alternatives are sufficient individually, not a checklist of requirements.
+const habitEvidence: Record<string, string> = {
+  "hit the gym": "Accept gym equipment, a workout setup, or a person taking a gym mirror selfie. A gym mirror selfie is sufficient; do not require visible exercise, weights, or a machine in use.",
+  "side hustle": "Accept a business project, relevant computer work, orders, products, or money such as cash or coins. A photo of money is sufficient; do not require proof of its source or a business workspace.",
+  "go for a walk": "Accept a walking route, a person walking, or their walking shoes. A photo of their shoes alone is sufficient; do not require a path, outdoor scenery, or visible movement.",
+  "go for a run": "Accept a road, trail, track, a person running, or their running shoes. A photo of their shoes alone is sufficient; do not require a route, outdoor scenery, or visible movement.",
+  "smile": "Accept a photo showing the user smiling. A visible smile is sufficient; teeth do not have to be showing.",
+  "drink some water": "Accept a glass or bottle of water, or a person physically drinking water from a glass, bottle, or other drinking container. Drinking in progress is sufficient; do not require the container to be set down or still full.",
+};
+
 function prompt(habitName: string, hint: string): string {
+  const evidence = habitEvidence[habitName.trim().toLowerCase()];
   return [
     `You are checking a photo somebody took as proof they did this habit: "${habitName}".`,
-    hint ? `A good photo shows: ${hint}` : "",
+    evidence ? `Accepted evidence for this habit: ${evidence}` : (hint ? `A good photo shows: ${hint}` : ""),
+    evidence ? "Each listed alternative is sufficient on its own. Do not reject accepted evidence merely because it is a close-up or lacks the broader scene." : "",
     "",
     "Pass if the photo plausibly shows the habit being done or about to be done.",
     "Be generous about framing, lighting, angle and mess. People take these in a hurry.",
     "",
     "Fail only if:",
     "- the photo has nothing to do with the habit",
-    "- it is a photo of a screen, a screenshot, or an image of an image",
+    "- it substitutes a displayed picture/video of a physical activity or object for doing that physical habit",
+    "Screen-based work exception: for Deep Work, studying, reading, coding, writing, or working on a business, accept a camera photo of a laptop, monitor, tablet, or e-reader showing relevant work or preparation.",
+    "The screen itself is sufficient evidence for these habits; do not require a desk, keyboard, hands, or the surrounding workspace in frame.",
+    "A photo of a real work screen is not a screenshot or cheating. Do not reject it merely because it is a screen.",
+    "Still reject unrelated entertainment, a blank screen, or a displayed photo pretending to prove a physical habit. Reject uploaded screenshots or copied images rather than camera photos.",
     "- it is black, blank, too dark or blurred to tell what it shows",
     "- it shows only a small or unrelated part of the scene, with no credible evidence of the habit",
     "",
@@ -434,13 +452,13 @@ function prompt(habitName: string, hint: string): string {
     "  on a pass, be warm about it, like you're genuinely pleased for them.",
     "  on a fail, say what the photo shows instead, plainly and a little dryly.",
     "  fail examples: \"that's just your desk, i can't find the book anywhere.\"",
-    "                 \"that's a photo of a screen, nice try.\"",
+
     "                 \"it's way too dark, i can't make anything out.\"",
     "",
     "fix: on a fail, one casual instruction for THIS habit that would get them a passing shot.",
     "  say it for this habit specifically, not in general.",
     "  fail examples: \"open the book up and get it in the frame, then try again.\"",
-    "                 \"point it at the real thing, not a screen.\"",
+
     "                 \"turn a light on and take another one.\"",
     "  on a pass, leave it as an empty string.",
   ]

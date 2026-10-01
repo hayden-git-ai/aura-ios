@@ -73,6 +73,7 @@ struct WallOfWinsSheet: View {
         // card would clip it at the corners.
         .fullScreenCover(item: $selected) { win in
             WinDetailView(win: win) { store.deleteWin(win) }
+                .preferredColorScheme(.dark)
         }
         .alert("Delete all wins?", isPresented: $confirmingWipe) {
             Button("Delete All", role: .destructive) { store.deleteAllWins() }

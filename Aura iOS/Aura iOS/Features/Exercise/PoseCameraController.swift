@@ -61,6 +61,12 @@ final class PoseCameraController: NSObject, ObservableObject {
     private var candidateSince = Date()
     private static let complainAfter: TimeInterval = 0.7
     private static let clearAfter: TimeInterval = 0.3
+    /// Vision occasionally misses one frame while a limb crosses another. Keep
+    /// the last real skeleton on screen for a short grace period so the overlay
+    /// does not blink even though framing remains honest and can still warn.
+    private var lastPose: BodyPose?
+    private var lastPoseAt = Date.distantPast
+    private static let poseGrace: TimeInterval = 0.18
 
     init(exercise: Exercise) {
         self.engine = RepEngine(exercise: exercise)
@@ -180,7 +186,9 @@ extension PoseCameraController: AVCaptureVideoDataOutputSampleBufferDelegate {
             for (name, point) in recognized where point.confidence >= 0.5 {
                 points[name] = point.location
             }
-            bodyPose = BodyPose(points: points)
+            if !points.isEmpty {
+                bodyPose = BodyPose(points: points)
+            }
         }
 
         let now = Date()
@@ -190,6 +198,17 @@ extension PoseCameraController: AVCaptureVideoDataOutputSampleBufferDelegate {
             raw = engine.canRead ? .good : .partial
         } else {
             raw = .absent
+        }
+
+        let displayPose: BodyPose?
+        if let bodyPose {
+            lastPose = bodyPose
+            lastPoseAt = now
+            displayPose = bodyPose
+        } else if now.timeIntervalSince(lastPoseAt) < Self.poseGrace {
+            displayPose = lastPose
+        } else {
+            displayPose = nil
         }
 
         if raw != candidateFraming {
@@ -204,7 +223,7 @@ extension PoseCameraController: AVCaptureVideoDataOutputSampleBufferDelegate {
             guard let self else { return }
             self.portraitBufferSize = bufferSize
             // Pose updates every frame (isolated to the overlay's own object).
-            self.poseLayer.pose = bodyPose
+            self.poseLayer.pose = displayPose
             // Reps and framing change rarely — only publish on an actual change
             // so the main view isn't rebuilt on every frame.
             if self.reps != reps { self.reps = reps }

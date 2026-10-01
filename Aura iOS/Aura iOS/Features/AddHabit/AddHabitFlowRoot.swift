@@ -218,7 +218,7 @@ struct AddHabitFlowRoot: View {
                     color: startCategory.accent)
             }
         }
-        .preferredColorScheme(.light)
+        .preferredColorScheme(.dark)
         .onAppear {
             pinnedHabits = store.favoriteHabitIds
             pinnedExercises = store.favoriteExerciseIds

@@ -275,7 +275,7 @@ async function crispSendUserMessage(
         },
       }
     : { ...base, type: "text", content: msg.text };
-  const r = await checkedFetch(
+  await checkedFetch(
     "Crisp message relay",
     `${CRISP_API}/website/${c.websiteId}/conversation/${sessionId}/message`, {
     method: "POST",
@@ -283,10 +283,6 @@ async function crispSendUserMessage(
     body: JSON.stringify(payload),
     signal: AbortSignal.timeout(5_000),
   });
-  if (msg.mediaUrl) {
-    const rb = await r.json().catch(() => null);
-    console.log("[crisp] file msg status", r.status, "body", JSON.stringify(rb));
-  }
 }
 
 /** A simple "new message" line in Slack #support. Reply happens in Crisp. */

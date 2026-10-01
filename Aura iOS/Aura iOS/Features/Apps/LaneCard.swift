@@ -101,7 +101,7 @@ struct LaneCard: View {
         // A severity ramp: near-black for Forbidden (most severe — skulls and the
         // scared fox pop hard on it), the old Forbidden red slides down to
         // Tempting, blue for Allowed.
-        case .blocked: return Color(hex: "16151C")      // Forbidden — cold near-black (red pulled out)
+        case .blocked: return LightSheet.forbiddenLane      // Forbidden — cold near-black (red pulled out)
         case .distracting: return LightSheet.rippleRed  // Tempting — deep ripple red
         case .allowed: return LightSheet.blue           // Allowed — system blue
         }
@@ -172,7 +172,7 @@ struct LaneCard: View {
 
     private var artLayout: (height: CGFloat, offset: CGSize) {
         switch rule {
-        case .blocked:     return (130, CGSize(width: 18, height: 12))
+        case .blocked:     return (130, CGSize(width: 20, height: 12))
         case .distracting: return (134, CGSize(width: 17, height: 16))
         case .allowed:     return (142, CGSize(width: 8, height: 24))
         }
@@ -184,7 +184,7 @@ struct LaneCard: View {
     /// under it.
     private static let textFoxInset: CGFloat = 132
 
-    private static let rowIcon: CGFloat = 26
+    private static let rowIcon: CGFloat = 32
     /// How many apps a row shows before its last slot becomes a "+N" count.
     private static let rowSlots = 4
     /// The row area is always reserved at this height so an empty lane is the
@@ -221,7 +221,7 @@ struct LaneCard: View {
         // Layout box = an app tile's full footprint (so the row lines up with the
         // other lanes), with the art scaled up to cancel the sticker's
         // transparent margin (content is 0.83 of the canvas).
-        Image("StatsMostDistracting")
+        Image("PowerUpSkull")
             .resizable()
             .interpolation(.high)
             .scaledToFit()
@@ -238,7 +238,7 @@ struct LaneCard: View {
         let remaining = icons.count - visible.count
 
         return HStack(spacing: Theme.Spacing.s) {
-            ForEach(Array(visible.enumerated()), id: \.offset) { _, icon in
+            ForEach(visible, id: \.stableID) { icon in
                 tile(icon)
             }
             if overflowing {

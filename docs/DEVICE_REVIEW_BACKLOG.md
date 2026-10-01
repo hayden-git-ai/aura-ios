@@ -1,5 +1,170 @@
 # Cofounder device-review checklist
 
+## Build 11 release — September 30, 17:16 Eastern
+
+Signed archive and all six strict signatures passed. Uploaded internal-only, Apple processing Complete, compliance saved using previously confirmed unchanged declaration. App Store Connect status Testing; assigned only to Aura Internal Testing (Hayden Berio and Jesse Stone, two testers). No App Review submission. Evidence: docs/evidence/2026-09-30-focus-hours/build11-release.json. Includes Focus hours and Live Activity source repairs. Physical-device acceptance remains open.
+
+IMPORTANT: revised verify-proof source is staged in the Supabase editor but NOT deployed. Automatic approval review rejected production deployment for lack of explicit approval for this update. User was asked asynchronously; no deployment approval received yet. Existing live photo rules remain unchanged.
+
+
+## September 30 afternoon — Focus hours and prompt audit (not shipped)
+
+Live Activity expiry follow-up: user photographed loading overlays at 0:00 while first-use Allow was pending. Widget used Date.now...endsAt, an invalid reversed range after expiry. It now uses stable clamped start/end anchors. Controller no longer equates expiry with stale data, adopts stale activities left by prior versions, and refuses to heal/request already-expired unpaused timers. Simulator compile passed (build_sim_2026-09-30T20-59-06-535Z_pid79203_2df2ff5f.log). Exact first-use permission/lock-screen reproduction remains physical-device acceptance; spinner causality is not proven solely by source inspection. No automatic background dismissal guarantee: local timer remains at zero until app resumes and ends it. No upload.
+
+Prompt audit follow-up: model-only evidence rules now explicitly accept gym mirror selfies, Side Hustle money, walking/running shoes alone, a visibly smiling user, and physically drinking water. These six rules replace conversational UI hints in provider prompts; each alternative is sufficient without extra scene requirements. Proposed full prompt export refreshed. Four backend tests pass, including actual outgoing prompt checks for all six habits (stubbed provider; real photo verdicts untested). Still not deployed; no new build.
+
+User supersedes Hours saved/day with Focus hours: whole lifetime hours from completed Healthy Habits timers and Deep Focus. Profile now uses the same native StrokedNumber as the other stats; removed the remote DeviceActivity report host that produced a rectangular background. Existing lifetimeFocusMinutes account snapshot and Supabase progress.stats.focusMinutes carry the combined total; timer completion increments before the existing progress sync. Previously unrecorded Healthy Habits durations cannot be reconstructed. Paused/canceled timers and quick proofs do not earn completed timer minutes.
+
+Simulator build passed; screenshot profile-focus-hours.jpg verifies 0 and no card. Integration test combines 35 Deep Focus + 25 habit minutes, checks whole-hour thresholds, repeat refresh, quick proof exclusion and local account reload (1 passed). Backend tests: 3 passed with stubbed provider. Real camera verdict and live Supabase round-trip not exercised in this pass.
+
+Deep Work failure cause: shared server prompt rejected all screen photos, contradicting its Screen, desk, or notebook hint. Proposed local prompt accepts relevant computer work screens, preserving physical-habit anti-spoof rules. Full 22 current and proposed prompts exported under docs/evidence/2026-09-30-focus-hours/. User requests prompt audit before another build: no new TestFlight build or backend deployment.
+
+
+## September 30, 2026 build 9 follow-up — shipped as build 10
+
+Build 9 is installed according to Hayden’s TestFlight screenshots and is not accepted.
+The following repairs shipped in build 10. The signed archive and all six bundle signatures passed verification. Upload succeeded at 06:39 Eastern; Apple processing is Complete. After explicit user confirmation, the encryption declaration was saved and build 10 assigned only to Aura Internal Testing (Hayden Berio and Jesse Stone, two testers). App Store Connect now shows Testing. No App Review submission occurred. Physical-device acceptance remains incomplete. Archive and release evidence: docs/evidence/2026-09-30-build9-review/build10-archive.json.
+
+- App labels now receive the full cell width independently of icon sizing; frozen/lane icon views use token identity rather than array position. Native token rendering remains device-only acceptance.
+- App picker separates individual-app selection from explicit whole-category selection. Existing stored categories are preserved; device acceptance remains open.
+- Profile best streak now replays all preserved history, not 90 days. Habits done uses the persisted lifetime healthy-habit counter. Hours saved/day now calculates a lifetime daily average against seven pre-Aura baseline days inside the report extension. Host always displays 0 while unavailable. Complete historical coverage and the returned request interval require device verification; missing history is not fabricated.
+- Actual earn category palettes feed all success screens. Latest palettes: mint #08FCC7/#5EFDDB, exercise #4198FF/#84BCFF, focus #9986FF/#BDB0FF, pink #F36FAC/#F7A1C9. Passive Income CTA uses Apple Health setup pink #FF3B5C with white text (latest explicit correction); other CTA colors unchanged.
+- Profile, all success screens and earn details use black status-bar content. Home/image-backed earn main/Emergency/Wall of Wins use white. These later corrections supersede earlier blanket-white instructions.
+- Custom nav profile photos retain the default sticker’s actual outline and footprint.
+- Focus controls: thicker purple ring, larger outlined white timer, pulsing endpoint, purple Pause, plain red End session. Tip/offline cards use transparent category-colored borders.
+- Hold controls start/stop haptic rumble; shield primary button uses #2586FF. Physical haptics/shield verification remains open.
+- Raw diamond, treasure chest, heart, skull and coin pouch now receive the approved white outline. The 22 approved habit choices remain unchanged and unique.
+- Latest sheet corrections: smaller 54pt frozen icons, transparent app cards with category borders, transparent red minus controls, category-colored Add more apps buttons with white text. NSFW lock rebuilt from raw artwork with 30px/512 white outline. Forbidden row now shares updated PowerUpSkull; Forbidden fox shifted 2pt right. Leave Hard Mode shares End Session sticker at 136pt. Focus timer outline now matches the purple Pause button.
+- Welcome frame is rendered dark graphite; Get started uses the shared blue button with white text. Success headlines, subtitles and timer footnotes now use white. Card stickers use 32pt visible height based on cached opaque bounds, including the highlight diamond. All four updated screens captured in *-white-headings-normalized.jpg.
+- Welcome phone uses a native nighttime Home capture at the original dynamite pose, with screenshot-only mock values (64 streak, 320 coins, full progress). Temporary mock/capture code is removed after capture; no account data is seeded.
+
+Verification: Latest Debug build passed (build_sim_2026-09-30T09-35-02-247Z_pid79203_2dadcf27.log); final signed Release archive succeeded. Twelve focused tests passed (6 lifetime average, 4 lifetime streak, 2 selection identity). Current visual evidence is *-white-headings-normalized.jpg in docs/evidence/2026-09-30-build9-review/. Older tinted-rays and yellow Passive Income screenshots are superseded. The obsolete -success debug route was removed. The latest device check reported Hayden’s iPhone connected (no DDI); physical Screen Time, camera and haptic acceptance remains open. Upload succeeded with a nonblocking missing Sentry.framework dSYM warning.
+
+
+## September 29–30, 2026 release repair pass — prior build history
+
+Hayden authorized implementation, verification, and one new TestFlight upload for
+Hayden and Jesse only. This supersedes the dated build/upload holds below.
+App Review submission is not authorized. Historical device passes remain intact;
+they do not validate the current unshipped source. Baseline: `4c3160e`, 1.0 (7).
+Current work is uncommitted; corrected build 8 uploaded successfully as TestFlight
+Internal Only. App Store Connect shows **Testing**, assigned only to Aura Internal
+Testing (Hayden and Jesse). Build 8 is installed on the physical phone and launches to Home. Portrait
+Discord shield and handoff were exercised; broader device acceptance remains
+pending, including a reproduced generic intervention-name issue. No App Review submission.
+
+Root is the sole integrator/build/upload owner. Three visible Luna-medium tasks
+returned bounded patches: account/verification (`01a0f011-7e35-7413-9ad7-2b2606a5f05a`),
+Screen Time/intervention (`01a0f011-93e2-70b0-bb97-7b0af8f5cee7`), and
+habits/camera/visuals (`01a0f011-a16d-7711-8fa7-b8dc7a03f0b0`). All lanes are frozen.
+
+### Reopened after Hayden's build 8 screenshots (September 30, 00:23)
+
+Build 8 is **not accepted**. Reopened: token icon sizing on every surface,
+nav avatar footprint/outline, centered black app names, missing Hours Saved,
+intervention app-name handoff, sticker picker, and adding apps/categories.
+Local repairs are in progress and **not installed or physically verified**.
+The final exact-22 build 9 archive succeeded and strict signature verification passed
+for the app and five extensions, all version 1.0 (9). This supersedes earlier build 9
+archives. The running Simulator picker exposes exactly the approved 22 choices,
+including one toothbrush. Build 9 upload explicitly authorized and completed; Apple processing is Complete.
+Build ID: 1320505a-10e4-4d87-b15f-a632391fea0c. User explicitly confirmed the
+encryption declaration; saved successfully. TestFlight status is Testing, assigned
+only to Aura Internal Testing (Hayden and Jesse, two testers).
+Physical installation/verification remains pending.
+The live build 8 picker opened and a category selection increased its count;
+the probe was canceled. Saved categories/websites were absent from `iconSources`.
+Mirroring subsequently locked; Xcode reports no connected device.
+
+### Consolidated root causes, changes, and remaining acceptance
+
+| # | Report | Evidence and current disposition |
+|---|---|---|
+| 1 | Every photo scan unavailable | Production route accepts the shipped app key; upstream Gemini returns `API_KEY_INVALID` (2026-09-30 02:15 UTC). Hayden replaced `GEMINI_API_KEY`; live recheck at 03:19:59 UTC returned HTTP 200 and correctly rejected a synthetic blank gray JPEG. Credential outage resolved; this is not real-photo acceptance. Hayden explicitly approved production deployment; tested safeguards are deployed and freshly reloaded source matches exactly. Live checks: unauthorized 401, malformed image 415, synthetic blank 200 with passed:false. Real-camera acceptance remains pending. Relevant, irrelevant, ambiguous and unavailable cases remain live acceptance requirements. |
+| 2 | Habit stickers | Corrected 22-candidate Figma contact sheet uses transparent fills and the existing outline utility. Every Healthy Habits choice has a mapping. Approved by Hayden with an explicit no-duplicate-toothbrush constraint. Applied all 22 files in place; catalog remains 38 unique entries with exactly one `FoxHabitBrushTeeth`. The September 30 correction supersedes the partial 22-file treatment: the picker contains exactly the 22 approved habit stickers with stronger white contours. All generic/method/Settings/Apple Health choices are excluded; unrelated assets were restored. Physical picker acceptance remains open. |
+| 3 | Healthy Habits blue accents | Creation, reward chips, mode selector, Create/Save button, avatar background and sticker selection use the existing Healthy Habits mint accent. Final simulator screens visually checked; approved artwork replaced in place. |
+| 4 | Hours Saved decimal/unit/box | Report renders rounded integer hours without `h`, transparent background, and zero until 14 completed days exist. Removed overlapping host fallback in Release. DeviceActivityReport rendering requires phone acceptance. |
+| 5 | Generic intervention app name | Added Shield Configuration extension to record localized application names by token in the shared app group; notification carries the token to the app. All intervention styles consume the resolved name. Physical build 8 shield displays Discord, but the subsequent text intervention used “this”; metadata handoff remains unresolved. Do not mark this fix passed. |
+| 6 | Wrong selected app removed | Offset identity replaced with stable token/asset identity; token display order is deterministic; confirmation captures the selected item. Two mock-selection regression tests pass. Real-token first/middle/last removal pending. |
+| 7 | Tiny native app icons | Native Label icon intrinsic size is measured and fitted into the requested footprint. Mock art is unchanged. Real-token rendering is device-only and remains unverified. |
+| 8 | Exercise exit buttons too high | Added flexible space above bottom actions in the fixed-height exit sheet. Native screenshot acceptance pending. |
+| 9 | Navigation avatar too large | Reduced avatar footprint and stroke to match the tab family. Photo-avatar device review pending. |
+| 10 | Landscape generic Restricted shield | No Shield Configuration extension existed. New extension supplies Aura copy/colors/buttons, including a functioning Close action. Orientation remains system-owned. Signed distribution archive verified. Physical build 8 portrait shield shows Discord and Aura copy/buttons; landscape and Close-action acceptance remain pending. |
+| 11 | Splash audio persists after notification | Splash teardown now invalidates its display link, stops audio and deactivates the session when removed. Cold notification launch audio test pending. |
+| 12 | FaceTime Accept/Decline stuck | Computed random intervention style changed on view reevaluation while beat state persisted. Style is now captured once per presentation. Simulator Accept reaches challenge; Decline returns Home. Physical repeated-launch test pending. |
+| 13 | Settings suppresses intervention | Root presenter targets the top controller, retains window identity across full-screen covers, and preserves the underlying screen. Warm notification over Settings and cold-launch acceptance pending. |
+| 14 | Selected apps missing from Your Apps cards | Observable selection path reviewed; no physical reproduction yet. Stable identity/order and native icon changes may address presentation, but this item remains unresolved until actual selections are inspected on device. |
+| 15 | Status bar contrast | Home chooses day/night scheme; Healthy Habits keeps white status text over dark cave art while the builder uses light native controls; intervention surfaces select dark. Home night and Healthy Habits simulator contrast checked. Other screens remain device acceptance. |
+| 16 | UI disagrees with blocking / purchased timer | Shield refresh now coalesces concurrent requests and reapplies the latest plan instead of dropping changes. Purchase animation waits while intervention covers Home. Existing purchase persistence/activation regressions pass. Actual shield, foreground/background, timer and purchase flow still require device acceptance. |
+| 17 | Sign-out lands on wrong screen | Signed-out stale onboarding/setup flags reset to Welcome. Account snapshot is committed before auth is invalidated. Real sign-out/sign-in acceptance pending without deleting user data. |
+| 18 | Unwanted subscription intermediary | Removed holding/fallback page; gate presents Superwall directly. Dismissal refreshes entitlement before returning to onboarding; failures/skips exit safely. Real paywall purchase/dismissal acceptance pending. |
+| 19 | Home fox freezes | Video reconciles playback on window/app/audio lifecycle; frame animation pauses/resumes with screen visibility and scene state. Runtime foreground/return motion capture pending. |
+| 20 | Exercise pose glitches | Display overlay retains last pose for only 0.18 seconds on transient misses; rep engine consumes actual current detections. Two orientation/crop transform tests pass. Real movement, lighting, occlusion and reward accuracy remain unverified. |
+| 21 | Avatar/streak/coin persistence | Failed remote reads no longer trigger destructive pushes; dirty avatar edits are generation-guarded and writes serialized; sign-out preserves committed account snapshot. Account round-trip regression passes. Jesse's reported loss is not proven recovered or fully diagnosed; no real accounts were reset or deleted. Cross-device acceptance pending. |
+
+### Verification and release gates
+
+- Final approved source and all 22 sticker replacements compile in Release:
+  `build_sim_2026-09-30T03-04-16-782Z_pid79203_bdaaee53.log`, succeeded in 296.1s.
+  This is an unsigned simulator build, not a signed device archive or upload.
+- Signing update: generated and downloaded `Aura Shield Configuration App Store`
+  through Xcode. Profile `9de05544-9eb8-4cc8-86e9-3efb8e575829` includes
+  Family Controls, `group.Aura-App.Aura-iOS`, and the correct extension bundle ID;
+  expires September 13, 2027. Release signing is now manual, matching the other
+  targets. Build 8 archive succeeded; strict signature validation passed for the app and
+  all five extensions. First upload rejected: Shield Configuration used `ManagedSettings` instead
+  of `ManagedSettingsUI` in its extension-point identifier. Corrected against
+  the installed Xcode template; replacement archive `Aura-1.0-8-corrected.xcarchive` succeeded, its embedded
+  identifier and signatures were verified, and internal-only upload succeeded.
+  App Store Connect build `002773b6-3d84-4286-b5e9-329136f5714e` is Testing in
+  the verified two-tester internal group. Export compliance uses the established
+  system-encryption classification. Non-blocking Sentry dSYM warning
+  remains (UUID `129869DE-8B80-3F3E-AE94-2B24ECDAAC88`).
+- Hayden replaced the Gemini secret; live endpoint recovered (HTTP 200, blank
+  image rejected). Physical phone has installed TestFlight 1.0 (8); Home startup,
+  existing avatar, selected Discord cards, and portrait shield were observed.
+  `devicectl` still reports no connected devices; broader checks remain pending.
+
+- Approved sticker assets compile in Debug: `build_sim_2026-09-30T03-01-14-043Z_pid79203_8f187df6.log`. Catalog check: 38 unique entries, one toothbrush. Asset hashes are in `evidence/2026-09-29-release/approved-sticker-assets.json`.
+
+- Final Debug source compiles (`build_sim_2026-09-30T02-57-39-136Z_pid79203_b8c88c9f.log`).
+  [Healthy Habits](evidence/2026-09-29-release/healthy-habit-mint.png) and
+  [sticker picker](evidence/2026-09-29-release/sticker-picker-mint.png) were
+  visually checked on that binary, including mint controls, white status text
+  over cave artwork and a legible native off switch.
+- A second Release build passed (`build_sim_2026-09-30T02-47-56-400Z_pid79203_7918442a.log`).
+  It predates the final Create-button/toggle colors and cave/builder appearance
+  adjustments, which are Debug-compiled above. Final Release archive validation
+  remains required once release dependencies are resolved.
+- Source hashes: [snapshot](evidence/2026-09-29-release/source-snapshot.json).
+  Disposable completed test-product bundles were removed for disk space;
+  result bundles, logs, simulator products and signed archives were retained.
+
+- Debug integrated build passed. Latest selected suite: **48 passed, 0 failed**;
+  StoreKitLocalTests excluded intentionally. Result bundle:
+  `~/Library/Developer/XcodeBuildMCP/workspaces/Aura-iOS-4b8535092641/result-bundles/test_sim_2026-09-30T02-34-59-560Z_pid79203_220568df.xcresult`.
+  These tests do not exercise production Gemini, actual Screen Time tokens,
+  hardware camera, or App Store purchases.
+- Release compilation passed, including the retained-window presenter adjustment.
+  The tool response timed out at 300 seconds, but its completed log ends with
+  `** BUILD SUCCEEDED **` (`build_sim_2026-09-30T02-36-40-120Z_pid79203_bf884dc1.log`).
+  The Release app was installed and launched in Simulator; Welcome rendered
+  successfully ([startup](evidence/2026-09-29-release/release-startup.png)).
+  Local verification-handler tests: 2 passed; these stub providers.
+  Development installation remains unavailable (no registered test devices);
+  the new extension’s distribution profile is now present locally.
+- Evidence: [sticker sheet](evidence/2026-09-29-release/aura-sticker-candidates-contact-sheet.png),
+  [mapping](evidence/2026-09-29-release/aura-sticker-candidates-manifest.md),
+  [FaceTime accepted](evidence/2026-09-29-release/mirror-accepted.png),
+  [FaceTime declined to Home](evidence/2026-09-29-release/mirror-declined-home.png).
+- Pending: real-photo live acceptance,
+  remaining device checks and diagnosis of generic intervention app naming.
+  Production verification safeguards are deployed; build 8 is installed. Apple processing and
+  internal group assignment for Hayden/Jesse are complete.
+  The corrected archive is uploaded; do not create another build unnecessarily.
+
+---
+
 Status: local implementation integrated across the three Luna lanes. Further
 findings may be appended before the next build upload. Implementation and local
 verification are authorized; uploads, production deployments and phone

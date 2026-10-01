@@ -108,6 +108,7 @@ struct EarnSuccessView<Art: View>: View {
         .padding(.bottom, Theme.Spacing.xl)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(LightSheet.bg.ignoresSafeArea())
+        .preferredColorScheme(.light)
         .opacity(appeared ? 1 : 0)
         .onAppear {
             Haptics.notify(.success)
@@ -205,26 +206,98 @@ struct EarnHighlightCard<Icon: View>: View {
 /// read as one family. (Lock In's, adopted across the set.)
 struct EarnHighlightGem: View {
     var body: some View {
-        Image("CameraRepsHard")
-            .resizable()
-            .interpolation(.high)
-            .scaledToFit()
-            .frame(width: 28, height: 28)
+        EarnTileIcon(asset: "CameraRepsHard")
     }
 }
 
-/// A sticker icon sized for a stat tile.
+/// A stat sticker with the same visible height, independent of transparent PNG padding.
 struct EarnTileIcon: View {
     let asset: String
+    private var contourWidth: CGFloat {
+        switch asset {
+        case "StreakFlame": 0
+        case "FoxAppleHealth": 0.25
+        case "EarnCardIcon": 0.4
+        case "CameraRepsHard": 0
+        default: 0.6
+        }
+    }
     var body: some View {
+        let geometry = SuccessStickerGeometry.geometry(for: asset)
+        // Include the additional white contour in the shared 32pt visible height.
+        let scale = (32 - 2 * contourWidth) / geometry.ink.height
         Image(asset)
             .resizable()
             .interpolation(.high)
-            .scaledToFit()
+            .frame(width: geometry.size.width * scale, height: geometry.size.height * scale)
+            .modifier(SuccessStickerContour(width: contourWidth))
+            .offset(x: (geometry.size.width / 2 - geometry.ink.midX) * scale,
+                    y: (geometry.size.height / 2 - geometry.ink.midY) * scale)
             .frame(width: 40, height: 40)
     }
 }
 
+/// Measure once per named asset. Alpha >= 128 captures the sticker and white rim,
+/// excluding its soft shadow. This also covers legacy and newly added habit stickers.
+@MainActor
+private enum SuccessStickerGeometry {
+    struct Geometry {
+        let size: CGSize
+        let ink: CGRect
+    }
+    private static var cache: [String: Geometry] = [:]
+
+    static func geometry(for asset: String) -> Geometry {
+        if let cached = cache[asset] { return cached }
+        guard let image = UIImage(named: asset)?.cgImage else {
+            return Geometry(size: CGSize(width: 40, height: 40),
+                            ink: CGRect(x: 0, y: 0, width: 40, height: 40))
+        }
+        let width = image.width, height = image.height
+        let size = CGSize(width: width, height: height)
+        var bytes = [UInt8](repeating: 0, count: width * height * 4)
+        var minX = width, minY = height, maxX = -1, maxY = -1
+        bytes.withUnsafeMutableBytes { buffer in
+            guard let context = CGContext(data: buffer.baseAddress, width: width, height: height,
+                bitsPerComponent: 8, bytesPerRow: width * 4,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue) else { return }
+            context.draw(image, in: CGRect(origin: .zero, size: size))
+            let pixels = buffer.bindMemory(to: UInt8.self)
+            for y in 0..<height {
+                for x in 0..<width where pixels[(y * width + x) * 4 + 3] >= 128 {
+                    minX = min(minX, x); maxX = max(maxX, x)
+                    minY = min(minY, y); maxY = max(maxY, y)
+                }
+            }
+        }
+        let ink = maxX >= minX
+            ? CGRect(x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1)
+            : CGRect(origin: .zero, size: size)
+        let result = Geometry(size: size, ink: ink)
+        cache[asset] = result
+        return result
+    }
+}
+
+/// Complements each baked contour to match the flame at its rendered size.
+private struct SuccessStickerContour: ViewModifier {
+    let width: CGFloat
+    func body(content: Content) -> some View {
+        content.background {
+            if width > 0 {
+                ZStack {
+                    ForEach(0..<8) { step in
+                        let angle = Double(step) * .pi / 4
+                        content.shadow(color: .white, radius: 0,
+                                       x: width * CGFloat(cos(angle)), y: width * CGFloat(sin(angle)))
+                    }
+                }
+                .accessibilityHidden(true)
+            }
+        }
+    }
+}
 
 /// The all-time ranking highlight — where this habit/exercise sits among its
 /// kind by how often you do it. A real rank, the way Lock In ranks a session.
@@ -243,8 +316,6 @@ func earnRankHighlight(rank: Int, total: Int, noun: String) -> String {
 /// A screen picks the flat-white base or this one; neither hand-rolls the layout.
 /// Terminal by design: no back, no close.
 struct SunburstSuccessView<Art: View>: View {
-    let rayLighter: Color
-    let rayDarker: Color
     /// Where the icon (and the rays behind it) sit, as a fraction of the screen —
     /// the streak fox's spot. A screen with a detail block nudges it up to make
     /// room for the tiles.
@@ -266,12 +337,27 @@ struct SunburstSuccessView<Art: View>: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var appeared = false
 
+    private var successAccent: Color {
+        method == .healthSync ? LightSheet.passiveIncomeSuccessPink : method.accent
+    }
+    private var successRays: (darker: Color, lighter: Color) {
+        switch method {
+        case .photoTask: LightSheet.healthySuccessRays
+        case .exercise: LightSheet.exerciseSuccessRays
+        case .focus: LightSheet.focusSuccessRays
+        case .healthSync: LightSheet.passiveSuccessRays
+        }
+    }
+    private var successShade: Color {
+        method == .healthSync ? LightSheet.passiveIncomeSuccessPinkShade : method.accentShade
+    }
+
     var body: some View {
         ZStack {
             // The rays stay centred behind the fox: the fox's block drops 24pt and
             // its own art lifts 8pt, so the sunburst's centre follows by that net
             // 16pt (as a fraction of the screen height).
-            SunburstBackground(lighter: rayLighter, darker: rayDarker,
+            SunburstBackground(lighter: successRays.lighter, darker: successRays.darker,
                                centre: iconCentre + 16.0 / 874.0)
                 .ignoresSafeArea()
 
@@ -290,7 +376,7 @@ struct SunburstSuccessView<Art: View>: View {
                     // each — the title and the fox's line shouldn't wrap.
                     Text(title)
                         .auraFont(.display, 26, .bold)
-                        .foregroundStyle(SheetType.titleColor)
+                        .foregroundStyle(.white)
                         .multilineTextAlignment(.center)
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
@@ -298,7 +384,7 @@ struct SunburstSuccessView<Art: View>: View {
 
                     Text(blurb)
                         .auraFont(.body, 16, .regular)
-                        .foregroundStyle(SheetType.subtitleColor)
+                        .foregroundStyle(.white)
                         .multilineTextAlignment(.center)
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
@@ -315,15 +401,16 @@ struct SunburstSuccessView<Art: View>: View {
                     Spacer(minLength: Theme.Spacing.xl)
 
                     LightPrimaryButton(title: ctaTitle,
-                                       face: method.accent,
-                                       shade: method.accentShade,
+                                       face: successAccent,
+                                       textColor: .white,
+                                       shade: successShade,
                                        action: onContinue)
 
                     // Reserved whether or not there's a footnote, so the button
                     // lands in the same spot on every flow — matching streak.
                     Text(footnote ?? " ")
                         .auraFont(.body, SheetType.subtitle, .regular)
-                        .foregroundStyle(LightSheet.controlIdle)
+                        .foregroundStyle(.white)
                         .multilineTextAlignment(.center)
                         .opacity(footnote == nil ? 0 : 1)
                         .accessibilityHidden(footnote == nil)
@@ -343,6 +430,7 @@ struct SunburstSuccessView<Art: View>: View {
             .ignoresSafeArea(edges: .top)
             .opacity(appeared ? 1 : 0)
         }
+        .preferredColorScheme(.light)
         .onAppear {
             Haptics.notify(.success)
             guard !reduceMotion else { appeared = true; return }

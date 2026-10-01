@@ -31,12 +31,6 @@ struct AuraTabBar: View {
 
     private let icon: CGFloat = 40
 
-    /// Match the baked sticker pipeline instead of giving profile photos a
-    /// visibly heavier ring than the four illustrated tabs.
-    private var profileContour: CGFloat {
-        max(LightSheet.stickerContourFloor, icon * LightSheet.stickerContour)
-    }
-
     var body: some View {
         HStack(spacing: 0) {
             ForEach(items, id: \.self) { tab in
@@ -102,13 +96,23 @@ struct AuraTabBar: View {
     private func tabIcon(_ tab: AuraTab) -> some View {
         if tab == .profile, let data = profileImageData,
            let image = UIImage(data: data) {
-            Image(uiImage: image)
+            // Preserve the default sticker itself as the outline. Its 512px
+            // canvas has an opaque contour at (68,53)-(444,435), with the
+            // purple face at (104,89)-(408,399). Replace only that face so
+            // uploaded photos have exactly the same white edge and footprint.
+            Image(tab.sticker)
                 .resizable()
-                .scaledToFill()
+                .interpolation(.high)
+                .scaledToFit()
                 .frame(width: icon, height: icon)
-                .clipShape(Circle())
-                .overlay(Circle().strokeBorder(.white, lineWidth: profileContour))
-                .shadow(color: .black.opacity(0.18), radius: 3, y: 1)
+                .overlay {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: icon * 304 / 512, height: icon * 310 / 512)
+                        .clipShape(Ellipse())
+                        .offset(y: -icon * 12 / 512)
+                }
         } else {
             ZStack {
                 Image(tab.sticker)

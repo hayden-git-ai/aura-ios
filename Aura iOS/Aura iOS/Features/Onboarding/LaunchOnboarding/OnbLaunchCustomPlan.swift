@@ -61,7 +61,7 @@ struct OnbLaunchCustomPlan: View {
             Text("Your personalized plan is ready")
                 .auraFont(.body, SheetType.banner, .bold)
                 .foregroundStyle(.white)
-            Text("You will feel like yourself again by")
+            Text("Follow your plan through")
                 .auraFont(.body, SheetType.banner, .bold)
                 .foregroundStyle(.white)
                 .padding(.top, 2)
@@ -81,20 +81,20 @@ struct OnbLaunchCustomPlan: View {
 
     private var heroHeadline: String {
         flow.firstName.isEmpty
-            ? "In 4 weeks you won't recognize yourself."
-            : "In 4 weeks you won't recognize yourself, \(flow.firstName)."
+            ? "Your next 4 weeks start here."
+            : "Your next 4 weeks start here, \(flow.firstName)."
     }
 
     private var arcBand: some View {
         VStack(spacing: Theme.Spacing.m) {
             OnbWeekCard(week: 1, title: "The reset", emoji: "🌱",
-                        lines: ["You scroll less without trying", "You fall asleep faster", "The small wins feel huge"])
+                        lines: ["Cut the easiest scroll triggers", "Set a calmer bedtime", "Stack a few small wins"])
             OnbWeekCard(week: 2, title: "The spark", emoji: "⚡️",
-                        lines: ["Focus lasts longer", "You stop putting things off", "Your mind feels less cluttered"])
+                        lines: ["Practice longer focus blocks", "Start before motivation arrives", "Make room for what matters"])
             OnbWeekCard(week: 3, title: "The lock in", emoji: "🔒",
-                        lines: ["Hard things stop feeling hard", "The good habits stick", "You get more done"])
+                        lines: ["Protect time for hard things", "Repeat the habits you chose", "Keep your phone out of the way"])
             OnbWeekCard(week: 4, title: "The comeback", emoji: "🏆",
-                        lines: ["Calm mornings, sharp focus", "Your phone stops running your life", "Life feels good again"])
+                        lines: ["Review what worked", "Keep the routines that helped", "Choose what comes next"])
         }
         .padding(.horizontal, Theme.Spacing.xl)
         .padding(.vertical, Theme.Spacing.xxl)

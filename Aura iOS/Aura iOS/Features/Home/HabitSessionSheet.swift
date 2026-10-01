@@ -38,6 +38,13 @@ private struct HabitSessionTimerView: View {
     var onTogglePause: () -> Void
     var onEnd: () -> Void
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var endpointExpanded = false
+    private static let ringSide: CGFloat = 280
+    private static let ringWidth: CGFloat = 10
+    private static let endpointSide: CGFloat = 16
+    private static let timerSize: CGFloat = 56
+
     private var remaining: Int { session.remainingSeconds(at: now) }
     private var progress: Double { session.progress(at: now) }
 
@@ -50,9 +57,11 @@ private struct HabitSessionTimerView: View {
             LightDragCapsule()
 
             ring
-                .padding(.top, Theme.Spacing.xl)
-
-            Spacer(minLength: Theme.Spacing.xl)
+                // This flexible region is exactly the space between the drag
+                // indicator and the controls, so the ring is centered between
+                // those two anchors instead of being pinned near the top.
+                .frame(maxHeight: .infinity, alignment: .center)
+                .padding(.vertical, Theme.Spacing.xl)
 
             VStack(spacing: Theme.Spacing.m) {
                 Button {
@@ -64,11 +73,11 @@ private struct HabitSessionTimerView: View {
                         Text(session.isPaused ? "Resume" : "Pause")
                     }
                     .font(SheetType.ctaFont)
-                    .foregroundStyle(LightSheet.title)
+                    .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .frame(height: 54)
-                    .background(.white, in: Capsule())
-                    .bottomDrop(Capsule(), face: .white, shade: LightSheet.whiteShade)
+                    .background(HabitCategory.focus.accent, in: Capsule())
+                    .bottomDrop(Capsule(), face: HabitCategory.focus.accent, shade: HabitCategory.focus.accentShade)
                 }
                 .buttonStyle(.plain)
 
@@ -76,17 +85,12 @@ private struct HabitSessionTimerView: View {
                     Haptics.impact(.light)
                     onEnd()
                 } label: {
-                    HStack(spacing: Theme.Spacing.s) {
-                        Image(systemName: "xmark")
-                        Text("End")
-                    }
+                    Text("End session")
                     .font(SheetType.ctaFont)
                     .foregroundStyle(LightSheet.danger)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 54)
-                    .background(
-                        Capsule().strokeBorder(LightSheet.danger.opacity(0.5), lineWidth: 1)
-                    )
+                    .frame(height: 44)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
@@ -98,19 +102,39 @@ private struct HabitSessionTimerView: View {
     private var ring: some View {
         ZStack {
             Circle()
-                .stroke(LightSheet.track, lineWidth: 4)
+                .stroke(LightSheet.track, lineWidth: Self.ringWidth)
             Circle()
                 .trim(from: 0, to: progress)
-                .stroke(LightSheet.blue, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                .stroke(HabitCategory.focus.accent, style: StrokeStyle(lineWidth: Self.ringWidth, lineCap: .round))
                 .rotationEffect(.degrees(-90))
                 .animation(.linear(duration: 1), value: progress)
 
+            Circle()
+                .fill(HabitCategory.focus.accent)
+                .frame(width: Self.endpointSide, height: Self.endpointSide)
+                .scaleEffect(endpointExpanded && !session.isPaused && !reduceMotion ? 1.3 : 1)
+                .shadow(color: HabitCategory.focus.accent.opacity(endpointExpanded && !session.isPaused && !reduceMotion ? 0.4 : 0),
+                        radius: endpointExpanded ? 6 : 0)
+                .offset(y: -Self.ringSide / 2)
+                .rotationEffect(.degrees(progress * 360))
+                .animation(.linear(duration: 1), value: progress)
+                .onAppear {
+                    guard !reduceMotion else { return }
+                    withAnimation(.linear(duration: 1.2).repeatForever(autoreverses: true)) {
+                        endpointExpanded = true
+                    }
+                }
+
             VStack(spacing: Theme.Spacing.xs) {
-                Text(clock)
-                    .auraFont(.body, 46, .bold)
-                    .foregroundStyle(LightSheet.title)
-                    .monospacedDigit()
-                    .contentTransition(.numericText())
+                StrokedNumber(
+                    text: clock,
+                    font: Typography.displayUIFont(size: Self.timerSize, weight: .black, tabular: true),
+                    fill: .white,
+                    stroke: UIColor(HabitCategory.focus.accent),
+                    outlineWidth: Self.timerSize * StrokedNumeral.outlineRatio
+                )
+                .fixedSize()
+                .accessibilityLabel(clock)
                 // Sentence case and untracked, like every other caption. This
                 // was the last all-caps label left after the stat row.
                 Text("Until focus session ends")
@@ -118,6 +142,6 @@ private struct HabitSessionTimerView: View {
                     .foregroundStyle(LightSheet.subtitle)
             }
         }
-        .frame(width: 208, height: 208)
+        .frame(width: Self.ringSide, height: Self.ringSide)
     }
 }

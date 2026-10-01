@@ -59,10 +59,10 @@ struct FocusTimerSetupView: View {
                     Image(systemName: "square.and.arrow.up")
                         .font(.system(size: 14, weight: .bold))
                 }
-                .foregroundStyle(LightSheet.title)
+                .foregroundStyle(HabitCategory.focus.accent)
                 .padding(.horizontal, Theme.Spacing.l)
                 .padding(.vertical, Theme.Spacing.s)
-                .background(LightSheet.chromeOnLight, in: Capsule())
+                .overlay(Capsule().strokeBorder(HabitCategory.focus.accent, lineWidth: 2))
             }
             .buttonStyle(PressBounceStyle())
             .padding(.bottom, Theme.Spacing.s)

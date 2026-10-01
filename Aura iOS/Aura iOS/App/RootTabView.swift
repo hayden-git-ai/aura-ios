@@ -85,7 +85,6 @@ struct RootTabView: View {
     @State private var showHealthSheet = false
     @State private var navChrome = NavChrome()
     #if DEBUG
-    @State private var debugSuccess: HabitCategory?
     @State private var purchasePreviewOwner = StorePurchasePreviewOwner()
     #endif
     #if DEBUG
@@ -169,6 +168,9 @@ struct RootTabView: View {
             .ignoresSafeArea()
         }
         .background(Theme.Color.background.ignoresSafeArea())
+        // Home uses white system status-bar content over its artwork.
+        // Profile, Apps and Stats use black, as requested.
+        .preferredColorScheme(selectedTab == .home ? .dark : .light)
         .environment(navChrome)
         #if DEBUG
         .environment(ProcessInfo.processInfo.arguments.contains("-storepurchasepreview")
@@ -191,6 +193,8 @@ struct RootTabView: View {
                     pendingLaunch = launch
                 }
             })
+            // All earn destinations keep illustrated artwork behind the status bar.
+            .preferredColorScheme(.dark)
         }
         .fullScreenCover(item: $pendingLaunch) { launch in
             launchView(launch)
@@ -208,54 +212,13 @@ struct RootTabView: View {
             // One style is built, so this is the dialogue either way — but it
             // goes through the store's picker so adding the others changes
             // nothing here.
-            InterventionView(appName: "Instagram",
-                             style: forcedStyle ?? store.interventionStyle) {}
+            StableInterventionSession(appName: "Instagram",
+                                      style: forcedStyle ?? store.interventionStyle)
         }
         .fullScreenCover(isPresented: $showHealthSheet) {
             AppleHealthView()
+                .preferredColorScheme(.dark)
         }
-        #if DEBUG
-        // `-success` walks the coins-bearing success screen through all four
-        // method colours, one per tap. Every real route to it is blocked in the
-        // Simulator: Photo Proof seeds no quick habits, Camera Reps needs reps
-        // from a camera that isn't there, and Passive Income has nothing to
-        // collect. Three of the four button colours had never been rendered.
-        .fullScreenCover(item: $debugSuccess) { method in
-            // Lock In has its own screen, so `-success focus` shows that one
-            // rather than the generic shape. One debug door for all four beats
-            // a second cover on the same view, which SwiftUI would not present.
-            if method == .focus {
-                FocusSuccessView(
-                    session: DeepFocusSession(durationMinutes: 90, earnedMinutes: 23, date: .now)
-                ) { debugSuccess = nil }
-            } else {
-            EarnSuccessView(
-                art: { EarnSuccessArt(asset: method.tileIconAsset) },
-                title: "Look at you go.",
-                blurb: "12 coins. You earned these by accident.",
-                coins: 12,
-                method: method,
-                ctaTitle: "Claim Reward"
-            ) {
-                // Advances rather than closing, so one launch shows all four in
-                // the order they sit on the FAB: blue, orange, violet, pink.
-                let order = HabitCategory.tileOrder
-                let next = (order.firstIndex(of: method) ?? 0) + 1
-                debugSuccess = next < order.count ? order[next] : nil
-            }
-            }
-        }
-        // `-focusdone` jumps to the Lock In celebration. Reaching it for real
-        // means sitting through a whole session.
-        .task {
-            let args = ProcessInfo.processInfo.arguments
-            guard let i = args.firstIndex(of: "-success") else { return }
-            // `-success` alone starts at Photo Proof; `-success exercise` jumps
-            // straight to one.
-            let named = i + 1 < args.count ? HabitCategory(rawValue: args[i + 1]) : nil
-            debugSuccess = named ?? .photoTask
-        }
-        #endif
         .fullScreenCover(isPresented: $showFocusSetup) {
             FocusTimerSetupView(
                 onStart: { config in
@@ -269,6 +232,7 @@ struct RootTabView: View {
                 },
                 onClose: { showFocusSetup = false }
             )
+            .preferredColorScheme(.light)
         }
         .fullScreenCover(item: $focusConfig) { config in
             DeepFocusFlowRoot(config: config)
@@ -426,6 +390,22 @@ struct RootTabView: View {
         .accessibilityHint(category.tileDescriptor)
     }
 
+}
+
+/// Store style selection is random. Freeze it for the whole presentation so
+/// clock updates cannot swap an incoming call into a different intervention.
+private struct StableInterventionSession: View {
+    let appName: String
+    @State private var style: InterventionStyle
+
+    init(appName: String, style: InterventionStyle) {
+        self.appName = appName
+        _style = State(initialValue: style)
+    }
+
+    var body: some View {
+        InterventionView(appName: appName, style: style) {}
+    }
 }
 
 #if DEBUG

@@ -109,7 +109,6 @@ struct OfflineShareSheet: View {
             guard let data = renderedUIImage.pngData() else { return }
             let url = URL.documentsDirectory.appendingPathComponent("aura-share-card.png")
             try? data.write(to: url)
-            print("[aura] share card written to \(url.path)")
         }
         #endif
     }

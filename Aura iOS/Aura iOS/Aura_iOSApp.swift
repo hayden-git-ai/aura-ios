@@ -25,6 +25,7 @@ struct Aura_iOSApp: App {
     /// whichever screen `RootGate` chose. False for the rest of the process.
     @State private var showSplash = true
     @State private var showNotificationIntervention = false
+    @State private var notificationInterventionStyle: InterventionStyle = .dialogue
 
     init() {
         FontRegistration.registerBundledFonts()
@@ -49,7 +50,7 @@ struct Aura_iOSApp: App {
             // Session replay is disabled; no account identity is attached.
             PostHogBootstrap.start()
         }
-        #if DEBUG
+        #if DEBUG && targetEnvironment(simulator)
         // A fresh simulator has no history, and an empty Stats screen isn't
         // what we're trying to look at. Release builds start empty, correctly.
         DayLogFile.seedIfEmpty()
@@ -67,6 +68,7 @@ struct Aura_iOSApp: App {
                 // RootGate/Part1/Part2 flow is being retired.)
                 AppGate()
                     .environment(store)
+                    .environment(\.notificationInterventionPresented, showNotificationIntervention)
                     // Applied at the true top of the hierarchy so it reliably cancels
                     // SwiftUI's automatic keyboard-avoidance reflow everywhere (a
                     // modifier on RootGate's inner Group did not take effect).
@@ -90,12 +92,19 @@ struct Aura_iOSApp: App {
             }
             .onReceive(notificationDelegate.$interventionRequestID.compactMap { $0 }) { _ in
                 showSplash = false
+                notificationInterventionStyle = store.interventionStyle
                 showNotificationIntervention = true
             }
-            .fullScreenCover(isPresented: $showNotificationIntervention) {
-                InterventionView(appName: "your blocked app",
-                                 style: store.interventionStyle) {}
+            .background {
+                PriorityInterventionPresenter(isPresented: $showNotificationIntervention) {
+                    InterventionView(appName: notificationDelegate.interventionAppName,
+                                     appToken: notificationDelegate.interventionAppToken,
+                                     style: notificationInterventionStyle) {
+                        showNotificationIntervention = false
+                    }
                     .environment(store)
+                    .id(notificationDelegate.interventionRequestID)
+                }
             }
         }
         // Nothing ticks while the app is away, so every countdown is stale on
@@ -110,6 +119,84 @@ struct Aura_iOSApp: App {
                 // A subscription can start, lapse, or be restored elsewhere.
                 Task { await store.refreshEntitlement() }
             }
+        }
+    }
+}
+
+private struct NotificationInterventionPresentedKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    var notificationInterventionPresented: Bool {
+        get { self[NotificationInterventionPresentedKey.self] }
+        set { self[NotificationInterventionPresentedKey.self] = newValue }
+    }
+}
+
+/// Notification routes must be able to appear above an existing Settings or
+/// habit cover. Present from the current controller in this window, preserving
+/// the user's underlying screen and its unsaved state.
+private struct PriorityInterventionPresenter<Content: View>: UIViewControllerRepresentable {
+    @Binding var isPresented: Bool
+    @ViewBuilder var content: () -> Content
+
+    func makeUIViewController(context: Context) -> UIViewController { UIViewController() }
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func updateUIViewController(_ controller: UIViewController, context: Context) {
+        context.coordinator.update(controller: controller, presented: isPresented, content: content)
+    }
+
+    static func dismantleUIViewController(_ controller: UIViewController, coordinator: Coordinator) {
+        coordinator.cancel()
+    }
+
+    final class Coordinator {
+        private var task: Task<Void, Never>?
+        private var host: UIHostingController<Content>?
+        private weak var window: UIWindow?
+
+        func update(controller: UIViewController, presented: Bool, content: @escaping () -> Content) {
+            // A full-screen cover can detach the underlying view from its
+            // window. Retain the window identity before that happens.
+            if let currentWindow = controller.view.window { window = currentWindow }
+            guard presented else { cancel(); return }
+            if let host {
+                host.rootView = content()
+                return
+            }
+            guard task == nil else { return }
+            task = Task { @MainActor [weak self, weak controller] in
+                defer { self?.task = nil }
+                while !Task.isCancelled {
+                    guard let self, let controller else { return }
+                    if let currentWindow = controller.view.window { self.window = currentWindow }
+                    if let window = self.window,
+                       let root = window.rootViewController,
+                       window.windowScene?.activationState == .foregroundActive {
+                        var top = root
+                        while let presented = top.presentedViewController { top = presented }
+                        if !top.isBeingPresented && !top.isBeingDismissed && top.transitionCoordinator == nil {
+                            let host = UIHostingController(rootView: content())
+                            host.modalPresentationStyle = .overFullScreen
+                            host.modalPresentationCapturesStatusBarAppearance = true
+                            host.isModalInPresentation = true
+                            self.host = host
+                            top.present(host, animated: true)
+                            return
+                        }
+                    }
+                    try? await Task.sleep(for: .milliseconds(100))
+                }
+            }
+        }
+
+        func cancel() {
+            task?.cancel()
+            task = nil
+            host?.dismiss(animated: true)
+            host = nil
         }
     }
 }
