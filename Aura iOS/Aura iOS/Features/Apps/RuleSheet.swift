@@ -209,11 +209,12 @@ struct RuleSheet: View {
 
     // MARK: - Apps
 
-    // 3 columns, like the Blocked Apps sheet and the Edit List grid.
+    // The first icon starts at the Apps heading edge and the last badge ends at
+    // Clear All's edge. Rows use the design system's largest spacing step.
     private let grid = [
-        GridItem(.flexible(), alignment: .top),
-        GridItem(.flexible(), alignment: .top),
-        GridItem(.flexible(), alignment: .top),
+        GridItem(.flexible(), spacing: 0, alignment: .topLeading),
+        GridItem(.flexible(), spacing: 0, alignment: .top),
+        GridItem(.flexible(), spacing: 0, alignment: .topTrailing),
     ]
 
     @ViewBuilder private var appsSection: some View {
@@ -236,29 +237,26 @@ struct RuleSheet: View {
                     .buttonStyle(.plain)
                 }
 
-                LazyVGrid(columns: grid, alignment: .leading, spacing: Theme.Spacing.m) {
+                LazyVGrid(columns: grid, alignment: .center, spacing: Theme.Spacing.xxxl) {
                     ForEach(icons, id: \.stableID) { icon in
                         appTile(icon)
                     }
                 }
+                .padding(.top, Theme.Spacing.m)
             }
         }
     }
 
-    /// One app: the remove badge along the top, then the icon over its name — a
-    /// transparent outlined card, with the minus above the icon.
+    /// One app icon with its removal control straddling the top-right corner.
     private func appTile(_ icon: AppIconSource) -> some View {
-        VStack(spacing: 0) {
-            HStack {
-                Spacer(minLength: 0)
-                minusBadge(icon)
-            }
-            AppTileLabel(source: icon, side: 64)
-                .padding(.bottom, Theme.Spacing.s)
+        ZStack(alignment: .topTrailing) {
+            AppIconView(source: icon, side: 64)
+                .appIconChrome(side: 64)
+            minusBadge(icon)
+                .offset(x: Theme.Spacing.m, y: -Theme.Spacing.m)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, Theme.Spacing.s)
-        .padding(.top, Theme.Spacing.xs)
+        .frame(width: 64, height: 64)
+        .frame(width: 76, height: 76, alignment: .topLeading)
     }
 
     private func minusBadge(_ icon: AppIconSource) -> some View {
@@ -269,10 +267,12 @@ struct RuleSheet: View {
             if rule == .blocked { activeSheet = .remove(icon) } else { pendingRemoval = icon }
         } label: {
             Image(systemName: "minus")
-                .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(LightSheet.rippleRed)
-                .frame(width: 22, height: 22)
-                .overlay(Circle().strokeBorder(LightSheet.rippleRed, lineWidth: 1.5))
+                .font(.system(size: 12, weight: .heavy))
+                .foregroundStyle(.white)
+                .frame(width: 24, height: 24)
+                .background(LightSheet.rippleRed, in: Circle())
+                .overlay(Circle().strokeBorder(.white, lineWidth: 1.5))
+                .shadow(color: .black.opacity(0.18), radius: 2, x: 0, y: 1)
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)

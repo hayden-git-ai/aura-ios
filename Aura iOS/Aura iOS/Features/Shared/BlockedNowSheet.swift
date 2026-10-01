@@ -14,11 +14,12 @@ struct BlockedNowSheet: View {
     @Environment(HabitStore.self) private var store
     @State private var showEmergency = false
 
-    // 3 columns, matching the Forbidden / Tempting / Allowed sheets.
+    // Outer artwork edges align with the section text edges. Rows use the
+    // design system's largest spacing step for an airy, regular grid.
     private let grid = [
-        GridItem(.flexible(), alignment: .top),
-        GridItem(.flexible(), alignment: .top),
-        GridItem(.flexible(), alignment: .top),
+        GridItem(.flexible(), spacing: 0, alignment: .topLeading),
+        GridItem(.flexible(), spacing: 0, alignment: .top),
+        GridItem(.flexible(), spacing: 0, alignment: .topTrailing),
     ]
 
     var body: some View {
@@ -40,7 +41,7 @@ struct BlockedNowSheet: View {
                             .auraFont(.display, 17, .bold)
                             .foregroundStyle(SheetType.titleColor)
 
-                        LazyVGrid(columns: grid, alignment: .leading, spacing: Theme.Spacing.m) {
+                        LazyVGrid(columns: grid, alignment: .center, spacing: Theme.Spacing.xxxl) {
                             ForEach(icons, id: \.stableID) { icon in
                                 tile(icon)
                             }
@@ -84,20 +85,12 @@ struct BlockedNowSheet: View {
         .disabled(used)
     }
 
-    /// Compact frozen artwork above the full-width name, with the emergency
-    /// action's red outline. This list is read-only.
+    /// Compact frozen artwork only. This list is read-only.
     private static let frozenIconSide: CGFloat = 54
 
     private func tile(_ icon: AppIconSource) -> some View {
-        // The ice PNG carries transparent pixels below its drips. A negative
-        // layout gap leaves one visible spacing step between art and title.
-        VStack(spacing: -Theme.Spacing.s) {
-            FrozenAppTile(icon: icon, side: Self.frozenIconSide)
-            AppNameView(source: icon)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, Theme.Spacing.s)
-        .padding(.vertical, Theme.Spacing.xs)
+        FrozenAppTile(icon: icon, side: Self.frozenIconSide)
+            .frame(width: 79)
     }
 
 
