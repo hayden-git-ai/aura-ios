@@ -1355,7 +1355,7 @@
 				CODE_SIGN_ENTITLEMENTS = AuraShieldConfiguration/AuraShieldConfiguration.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 13;
+				CURRENT_PROJECT_VERSION = 14;
 				DEVELOPMENT_TEAM = ARJKQYBWDW;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = AuraShieldConfiguration/Info.plist;
