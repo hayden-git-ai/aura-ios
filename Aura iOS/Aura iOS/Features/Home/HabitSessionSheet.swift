@@ -126,15 +126,16 @@ private struct HabitSessionTimerView: View {
                 }
 
             VStack(spacing: Theme.Spacing.xs) {
-                StrokedNumber(
-                    text: clock,
-                    font: Typography.displayUIFont(size: Self.timerSize, weight: .black, tabular: true),
-                    fill: .white,
-                    stroke: UIColor(HabitCategory.focus.accent),
-                    outlineWidth: Self.timerSize * StrokedNumeral.outlineRatio
-                )
-                .fixedSize()
-                .accessibilityLabel(clock)
+                Text(clock)
+                    .font(Font(Typography.displayUIFont(
+                        size: Self.timerSize,
+                        weight: .black,
+                        tabular: true
+                    )))
+                    .foregroundStyle(Color.black)
+                    .monospacedDigit()
+                    .fixedSize()
+                    .accessibilityLabel(clock)
                 // Sentence case and untracked, like every other caption. This
                 // was the last all-caps label left after the stat row.
                 Text("Until focus session ends")

@@ -9,6 +9,7 @@ import SwiftUI
 /// on one accidental tap. Same shape as the blocker break sheet: the safe choice
 /// is the primary button, ending is the red text underneath.
 struct LeaveFocusConfirmSheet: View {
+    var forfeitsProgress: Bool = true
     var onConfirmLeave: () -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -36,7 +37,9 @@ struct LeaveFocusConfirmSheet: View {
 
                 LightSheetTitle(
                     title: "End session?",
-                    subtitle: "Your apps stay blocked, and you won't earn any coins for the time you've put in so far."
+                    subtitle: forfeitsProgress
+                        ? "Your apps stay blocked, and you won't earn any coins for the time you've put in so far."
+                        : "Your apps stay blocked, and you'll earn coins for the full minutes you've focused so far."
                 )
 
                 Spacer(minLength: Theme.Spacing.l)

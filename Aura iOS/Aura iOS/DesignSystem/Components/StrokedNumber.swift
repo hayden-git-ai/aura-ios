@@ -52,6 +52,10 @@ struct StrokedNumber: UIViewRepresentable {
     private func configure(_ label: OutlinedLabel) {
         label.font = font
         label.fillColor = fill
+        // UILabel can be composited before its first drawText pass. Keep its
+        // native foreground in the final fill color too, so that first frame
+        // can never expose UIKit's default black text.
+        label.textColor = fill
         label.outlineColor = stroke
         label.outlineWidth = outlineWidth
         if tracking == 0 {

@@ -59,7 +59,6 @@ struct OnbLaunchHabits: View {
                 }
                 .padding(.horizontal, Theme.Spacing.s)
             }
-            .scrollClipDisabled()
         } bottom: {
             onbLaunchContinue(enabled: hasPick) {
                 flow.advance()

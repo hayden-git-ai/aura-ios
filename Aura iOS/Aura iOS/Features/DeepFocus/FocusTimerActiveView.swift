@@ -108,7 +108,13 @@ struct FocusTimerActiveView: View {
             if phase == .active { tick() }
         }
         .sheet(isPresented: $showLeaveConfirm) {
-            LeaveFocusConfirmSheet(onConfirmLeave: endEarly)
+            LeaveFocusConfirmSheet(forfeitsProgress: !untimed) {
+                if untimed {
+                    complete()
+                } else {
+                    endEarly()
+                }
+            }
         }
     }
 
@@ -134,10 +140,10 @@ struct FocusTimerActiveView: View {
     /// square, centered at the bottom.
     private var stopButton: some View {
         Button {
-            // Timed sessions confirm before forfeiting; an untimed (Extreme Focus)
-            // session has no "early" — stopping finishes it, banking the
-            // minutes focused so far.
-            if untimed { complete() } else { showLeaveConfirm = true }
+            // Every session requires the deliberate hold-to-end confirmation.
+            // Extreme Focus still banks its completed minutes after that hold;
+            // timed sessions forfeit the unfinished session.
+            showLeaveConfirm = true
         } label: {
             ZStack {
                 Circle()
