@@ -85,6 +85,7 @@ struct AppGate: View {
         }
         .task {
             configureRoutesForLaunch()
+            resolveAuthenticatedSetupRoute()
         }
         .fullScreenCover(isPresented: $showReturningSignIn) {
             AccountSignInSheet(onSignedIn: finishReturningSignIn)
@@ -103,7 +104,14 @@ struct AppGate: View {
             }
         }
         .onChange(of: store.isSignedIn) { _, signedIn in
-            guard !signedIn else { return }
+            if signedIn {
+                // SetupFlow is created at `.signIn`. A returning account can
+                // already be authenticated before SetupFlowView first appears,
+                // so waiting for `setup.step` to change never fires. Skip the
+                // duplicate sign-in screen as soon as authentication exists.
+                resolveAuthenticatedSetupRoute()
+                return
+            }
             // A signed-out session must re-enter through the welcome flow. The
             // account's local snapshot is retained by HabitStore, but these
             // device-level gates must not route the anonymous state to a paywall.
@@ -153,7 +161,25 @@ struct AppGate: View {
             }
             // Authentication skips the acquisition questions, never the paid
             // entitlement check or this device's setup requirements.
+            resolveAuthenticatedSetupRoute()
             onboardingDone = true
+        }
+    }
+
+    /// Route a returning account from restored device state. A completed setup
+    /// goes directly home; a fresh device continues at permissions/app selection,
+    /// never through a second sign-in screen.
+    private func resolveAuthenticatedSetupRoute() {
+        guard !store.accountPersistenceFailed,
+              store.isSignedIn else { return }
+
+        if setupDone || !store.blockConfig[.distracting].isEmpty {
+            setupDone = true
+            return
+        }
+
+        if setup.step == .signIn {
+            setup.advance()
         }
     }
 

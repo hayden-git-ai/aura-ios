@@ -792,21 +792,6 @@ struct SetupEmailSignInView: View {
 
                 if secure {
                     Button {
-                        if let pastedPassword = UIPasteboard.general.string, !pastedPassword.isEmpty {
-                            text.wrappedValue = pastedPassword
-                        }
-                        focused = .password
-                    } label: {
-                        Image(systemName: "doc.on.clipboard")
-                            .font(.system(size: 17, weight: .semibold))
-                            .foregroundStyle(LightSheet.controlIdle)
-                            .frame(width: 44, height: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Paste password")
-
-                    Button {
                         showPassword.toggle()
                         // Switching between SecureField and TextField replaces the
                         // underlying UIKit control. Restore first responder on the

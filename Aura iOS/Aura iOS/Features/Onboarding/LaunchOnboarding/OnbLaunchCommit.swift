@@ -83,6 +83,7 @@ private struct OnbLaunchHoldCommit: View {
     @State private var holding = false
     @State private var done = false
     @Environment(\.scenePhase) private var scenePhase
+    @State private var commit: DispatchWorkItem?
     @State private var completion: DispatchWorkItem?
 
     private let size: CGFloat = 88
@@ -110,11 +111,10 @@ private struct OnbLaunchHoldCommit: View {
         .scaleEffect(holding ? 0.95 : 1)
         .animation(.snappy(duration: 0.2), value: holding)
         .contentShape(Circle())
-        .onLongPressGesture(
-            minimumDuration: duration,
-            maximumDistance: 44,
-            perform: complete,
-            onPressingChanged: pressingChanged
+        .gesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { _ in begin() }
+                .onEnded { _ in cancel() }
         )
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Hold to commit")
@@ -126,20 +126,20 @@ private struct OnbLaunchHoldCommit: View {
         }
     }
 
-    private func pressingChanged(_ isPressing: Bool) {
-        if isPressing {
-            begin()
-        } else {
-            cancel()
-        }
-    }
-
     private func begin() {
         guard !holding, !done else { return }
         holding = true
         Haptics.impact(.light)
         Haptics.startRumble(intensity: 0.35, sharpness: 0.25, duration: duration)
         withAnimation(.linear(duration: duration)) { progress = 1 }
+
+        // Use the same deterministic timer-backed gesture as the proven shared
+        // hold control. SwiftUI's native long-press recognizer can cancel when
+        // the finger moves slightly during the hold, leaving this final screen
+        // with no way forward on a physical device.
+        let work = DispatchWorkItem { complete() }
+        commit = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + duration, execute: work)
     }
 
     private func complete() {
@@ -154,7 +154,9 @@ private struct OnbLaunchHoldCommit: View {
 
     private func stopInteraction() {
         cancel()
+        commit?.cancel()
         completion?.cancel()
+        commit = nil
         completion = nil
         Haptics.stopRumble()
         holding = false
@@ -164,6 +166,8 @@ private struct OnbLaunchHoldCommit: View {
 
     private func cancel() {
         guard holding, !done else { return }
+        commit?.cancel()
+        commit = nil
         holding = false
         Haptics.stopRumble()
         withAnimation(.easeOut(duration: 0.25)) { progress = 0 }

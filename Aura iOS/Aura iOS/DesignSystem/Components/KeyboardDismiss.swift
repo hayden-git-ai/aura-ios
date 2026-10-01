@@ -59,6 +59,19 @@ private struct GlobalKeyboardDismissal: UIViewRepresentable {
             UIApplication.shared.endEditingEverywhere()
         }
 
+        /// A tap inside an input must stay entirely native so a second tap or
+        /// long press can place the caret and open iOS's selection/Paste menu.
+        /// Every other tap still dismisses the current first responder.
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                               shouldReceive touch: UITouch) -> Bool {
+            var view = touch.view
+            while let current = view {
+                if current is UITextField || current is UITextView { return false }
+                view = current.superview
+            }
+            return true
+        }
+
         func gestureRecognizer(_ g: UIGestureRecognizer,
                                shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool { true }
     }
