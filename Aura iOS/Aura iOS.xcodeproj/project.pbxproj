@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		F49EC4B33054C08A001F1BC3 /* Sentry in Frameworks */ = {isa = PBXBuildFile; productRef = F49EC4B23054C08A001F1BC3 /* Sentry */; };
+		F49EC4B33054C08A001F1BC3 /* SentrySPM in Frameworks */ = {isa = PBXBuildFile; productRef = F49EC4B23054C08A001F1BC3 /* SentrySPM */; };
 		F49EC4B83054C459001F1BC3 /* PostHog in Frameworks */ = {isa = PBXBuildFile; productRef = F49EC4B73054C459001F1BC3 /* PostHog */; };
 		F4A6A4C93050A5EC00CFEE0C /* SuperwallKit in Frameworks */ = {isa = PBXBuildFile; productRef = F4A6A4C83050A5EC00CFEE0C /* SuperwallKit */; };
 		F4A99C11302A01D2007A8116 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F4A99C10302A01D2007A8116 /* WidgetKit.framework */; };
@@ -281,7 +281,7 @@
 				F4A9C779304F4B87007A8116 /* GoogleSignIn in Frameworks */,
 				F4A6A4C93050A5EC00CFEE0C /* SuperwallKit in Frameworks */,
 				F4A9D755304F73B4007A8116 /* RevenueCat in Frameworks */,
-				F49EC4B33054C08A001F1BC3 /* Sentry in Frameworks */,
+				F49EC4B33054C08A001F1BC3 /* SentrySPM in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -411,7 +411,7 @@
 				F4A9D754304F73B4007A8116 /* RevenueCat */,
 				F4A9D756304F73B4007A8116 /* RevenueCatUI */,
 				F4A6A4C83050A5EC00CFEE0C /* SuperwallKit */,
-				F49EC4B23054C08A001F1BC3 /* Sentry */,
+				F49EC4B23054C08A001F1BC3 /* SentrySPM */,
 				F49EC4B73054C459001F1BC3 /* PostHog */,
 			);
 			productName = "Aura iOS";
@@ -970,7 +970,7 @@
 				CODE_SIGN_ENTITLEMENTS = "Aura iOS/Aura iOS.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 14;
+				CURRENT_PROJECT_VERSION = 15;
 				DEVELOPMENT_TEAM = ARJKQYBWDW;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -1124,7 +1124,7 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_IDENTITY = "Apple Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 14;
+				CURRENT_PROJECT_VERSION = 15;
 				DEVELOPMENT_TEAM = ARJKQYBWDW;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = AuraTimerWidget/Info.plist;
@@ -1183,7 +1183,7 @@
 				CODE_SIGN_ENTITLEMENTS = AuraShieldMonitor/AuraShieldMonitor.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 14;
+				CURRENT_PROJECT_VERSION = 15;
 				DEVELOPMENT_TEAM = ARJKQYBWDW;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = AuraShieldMonitor/Info.plist;
@@ -1240,7 +1240,7 @@
 				CODE_SIGN_ENTITLEMENTS = AuraStatsReport/AuraStatsReport.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 14;
+				CURRENT_PROJECT_VERSION = 15;
 				DEVELOPMENT_TEAM = ARJKQYBWDW;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = AuraStatsReport/Info.plist;
@@ -1297,7 +1297,7 @@
 				CODE_SIGN_ENTITLEMENTS = AuraShieldAction/AuraShieldAction.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 14;
+				CURRENT_PROJECT_VERSION = 15;
 				DEVELOPMENT_TEAM = ARJKQYBWDW;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = AuraShieldAction/Info.plist;
@@ -1355,7 +1355,7 @@
 				CODE_SIGN_ENTITLEMENTS = AuraShieldConfiguration/AuraShieldConfiguration.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 14;
+				CURRENT_PROJECT_VERSION = 15;
 				DEVELOPMENT_TEAM = ARJKQYBWDW;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = AuraShieldConfiguration/Info.plist;
@@ -1517,10 +1517,10 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		F49EC4B23054C08A001F1BC3 /* Sentry */ = {
+		F49EC4B23054C08A001F1BC3 /* SentrySPM */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = F49EC4B13054C08A001F1BC3 /* XCRemoteSwiftPackageReference "sentry-cocoa" */;
-			productName = Sentry;
+			productName = SentrySPM;
 		};
 		F49EC4B73054C459001F1BC3 /* PostHog */ = {
 			isa = XCSwiftPackageProductDependency;
